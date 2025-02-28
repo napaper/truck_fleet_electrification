@@ -53,21 +53,43 @@ def get_connection() -> sqlalchemy.Engine:
     )
 
 
+# def get_query(name: str) -> str:
+#     """Load the text of a SQL query saved in the sql/ folder.
+
+#     Parameters
+#     ----------
+#     name : str
+#         Name of the query without the sql/ part or the file extension.
+
+#     Returns
+#     -------
+#     str
+#         SQL query.
+#     """
+#     with open(f"../sql/{name}.sql", "r") as f:
+#         return f.read()
+
+from pathlib import Path
+
 def get_query(name: str) -> str:
-    """Load the text of a SQL query saved in the sql/ folder.
-
-    Parameters
-    ----------
-    name : str
-        Name of the query without the sql/ part or the file extension.
-
-    Returns
-    -------
-    str
-        SQL query.
     """
-    with open(f"../sql/{name}.sql", "r") as f:
+    Retrieves the SQL query from a file in the `sql/` directory.
+    """
+
+    # Dynamically find the project root (assuming `utilities.py` is inside `src/`)
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent  # Moves up from `src/`
+
+    # Construct the correct path to the SQL file
+    sql_path = PROJECT_ROOT / "sql" / f"{name}.sql"
+
+    if not sql_path.exists():
+        raise FileNotFoundError(f"SQL file not found: {sql_path}")
+
+    # Read SQL file
+    with open(sql_path, "r", encoding="utf-8") as f:
         return f.read()
+
+
 
 
 def run_sql(filename, cache_result=True, **kwargs):

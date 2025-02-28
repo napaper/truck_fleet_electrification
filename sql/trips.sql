@@ -1,1 +1,20 @@
-select * from spirite.anon_master limit %(limit)s;
+
+SELECT  track_id_new as track_id, 
+        vehicle_id_anon as vehicle_id,
+        tour_id,start_time,
+        stop_time,
+        distance,
+        track_gap,
+        avg_speed,
+        max_speed,
+        n_signal_loss,
+        d_signal_loss,
+        r_signal_loss,
+        avg_hdop,
+        home_base,
+        long_haul,
+        rest_area,
+        service_area_fuel,
+        industrial_area,
+        cid
+                       from spirite.anon_master
