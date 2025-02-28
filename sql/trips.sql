@@ -1,0 +1,1 @@
+select * from spirite.anon_master limit %(limit)s;

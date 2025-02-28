@@ -1,0 +1,27 @@
+name: truck_fleet_analysis_and_electrification
+channels:
+  - anaconda
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.8.12
+  - pandas= 2.0.3 #if it breaks try 1.5.3 #Upgraded from 1.3.5 to fix SQLAlchemy error (https://stackoverflow.com/questions/75282511/df-to-table-throw-error-typeerror-init-got-multiple-values-for-argument)
+  - seaborn #breaks for 0.11.2 (in data_visualisation line 91: OptionError: "No such keys(s): 'mode.use_inf_as_null'")
+  - matplotlib=3.7.2
+  - pip
+  - plotly
+  - shapely
+  - joblib
+  - numpy
+  - sqlalchemy
+  - contextily
+  - geopandas
+  - fpdf
+  - svgpathtools
+  - svgpath2mpl
+  - pip:
+    - ipykernel
+    - ipywidgets
+    - scienceplots
+    - psycopg2
+    - latex
