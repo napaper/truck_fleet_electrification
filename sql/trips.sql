@@ -1,4 +1,3 @@
-
 SELECT  track_id_new as track_id, 
         vehicle_id_anon as vehicle_id,
         tour_id,start_time,
@@ -18,3 +17,5 @@ SELECT  track_id_new as track_id,
         industrial_area,
         cid
                        from spirite.anon_master
+                       
+                       

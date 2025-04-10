@@ -1,58 +1,50 @@
-"""
-This script is responsible for visualizing data using various scientific plotting libraries.
-It ensures consistency in visualization style and allows for seamless integration
-with both Jupyter Notebooks and standalone scripts.
-"""
-
-import sys
 import os
-import shutil
+import matplotlib.lines as mlines
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.table import Table
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize, ListedColormap
+from fpdf import FPDF
 import colorsys
-from pathlib import Path
-
-# Third-party libraries
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-import scienceplots  # Enables scientific-style plots
-from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.colors import Normalize, ListedColormap
-from matplotlib.table import Table
+import scienceplots
+
+# Add latex binary to python path to use scienceplots style 
+# see https://github.com/garrettj403/SciencePlots/wiki/FAQ#installing-latex for more information
+# the following line is for MacOS, for other operating systems the path might be different
+os.environ["PATH"] += os.pathsep + '/Library/TeX/texbin'
+
+
 from IPython.display import Markdown as md
 from smvis.gridfigure import GridFigure
 from smvis.utils import genLineLegendHandle, setFontSize, setLatexRendering
 
-
-# ---- Handle Dynamic Paths for Imports ----
 try:
-    # Dynamically determine project root
-    MODULE_PATH = Path(__file__).resolve().parent.parent  # Moves up from `src/`
-except NameError:
-    MODULE_PATH = Path.cwd()  # Jupyter Notebook case
-
-if MODULE_PATH.as_posix() not in sys.path:
-    sys.path.append(MODULE_PATH.as_posix())
-
-# Import custom modules after ensuring correct paths
-try:
-    from src import data_processing as dp
+    # Attempt relative import if within a package
+    from . import data_processing as dp
 except ImportError:
-    print("Warning: Failed to import `data_processing`. Ensure the module exists.")
+    # Fall back to absolute import if running as a script
+    import data_processing as dp
+    print('relative import failed, using absolute import instead')
 
+# HERE optionally set the style to scienceplots
+plt.style.use(['science', 'nature'])
+#plt.style.use(['default'])
 
-# ---- Style Configuration ----
-plt.style.use(['science', 'nature'])  # Apply scientific plotting style
-plt.rcParams["legend.frameon"] = True  # Enable legend frame for clarity
+#plt.rcParams['font.family'] = 'Arial'
+#plt.rcParams['font.size'] = 9
+plt.rcParams['legend.frameon'] = True
 
+# Define alpha values for grid lines
+alpha_major = dp.alpha_major
+alpha_minor = dp.alpha_minor
 
-# ---- Define Alpha Values ----
-alpha_major = dp.alpha_major if hasattr(dp, "alpha_major") else 0.8
-alpha_minor = dp.alpha_minor if hasattr(dp, "alpha_minor") else 0.4
-
-
-# ---- Color Configuration (Windows Compatible & Brightness Sorting) ----
-COLORS = {
+# Colors definition
+colors = {
     'TUMBlack': '#000000',
     'TUMWhite': '#FFFFFF',
     'TUMBlue1': '#005293',
@@ -73,43 +65,25 @@ COLORS = {
 }
 
 # Remove white and light gray colors from the palette
-COLORS_FILTERED = {k: v for k, v in COLORS.items() if v not in ['#FFFFFF', '#CCCCCC']}
+colors = {k: v for k, v in colors.items() if v not in ['#FFFFFF', '#CCCCCC']}
 
-
-# Function to calculate brightness for sorting
+# Function to calculate brightness
 def brightness(hex_color):
     rgb = tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))
     hls = colorsys.rgb_to_hls(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-    return hls[1]  # Luminance value for sorting
+    return hls[1]  # Luminance value
 
+# Sort color_list by brightness
+color_list = list(colors.values())
+color_list_sorted = sorted(color_list, key=brightness, reverse=True)
 
-# Sort colors by brightness
-color_list_sorted = sorted(COLORS_FILTERED.values(), key=brightness, reverse=True)
 cmap = ListedColormap(color_list_sorted[:97])
-
-
-# ---- LaTeX Configuration (Only Activated if Available, Windows Compatible) ----
-if shutil.which("pdflatex"):  # Checks if LaTeX is installed
-    os.environ["PATH"] += os.pathsep + shutil.which("pdflatex")
-
-
-# ---- Function to Save Figures ----
-def save_figure(fig, filename: str, output_dir: Path = MODULE_PATH / "output"):
-    """
-    Saves a figure to the specified directory.
-
-    :param fig: Matplotlib figure object
-    :param filename: Name of the output file
-    :param output_dir: Directory where the figure will be saved
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_dir / filename, dpi=300, bbox_inches="tight")
-    print(f"Figure saved: {output_dir / filename}")
 
 
 # ------------------------------------------------------------------------------
 #                              TEMPORAL PATTERN
 # ------------------------------------------------------------------------------
+
 
 def plot_kde_plots(df_trips):
     """
@@ -185,7 +159,8 @@ def plot_kde_plots(df_trips):
                  plt.Line2D([0], [0], color='r', linestyle=':', label='1 Std. Dev.')]
     axes[0, 1].legend(handles=red_lines, loc='upper right', fontsize=8, frameon=True)
     
-    plt.savefig('data/output/figures/temporal_pattern/kde_plots.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/kde_plots.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/kde_plots.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -282,7 +257,8 @@ def plot_weekly_distance_boxplot(df_trips):
     plt.xticks(rotation=90, fontsize=10 * scaling_factor)
     plt.yticks(fontsize=10 * scaling_factor)
     plt.tight_layout()
-    plt.savefig('data/output/figures/temporal_pattern/fleet_truck_weekday_boxplots.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/fleet_truck_weekday_boxplots.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/fleet_truck_weekday_boxplots.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -355,7 +331,8 @@ def plot_trip_duration_distance_histogram(df_trips, max_distance=400, max_durati
     print("Current font style:", plt.rcParams['font.style'])
 
     setFontSize(gf_dis.axes_list, 9)
-    plt.savefig('data/output/figures/temporal_pattern/trip_duration_and_distance.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/trip_duration_and_distance.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/trip_duration_and_distance.pdf', bbox_inches='tight')
     plt.show()
 
 # Farbe definieren
@@ -414,7 +391,8 @@ def plot_weekly_distances(distances_km):
     ax.set_xlabel('Weeks', fontsize=10)
     ax.set_ylabel('Distance / km', fontsize=10)
     plt.tight_layout()
-    plt.savefig('data/output/figures/temporal_pattern/weekly_distance_barplot.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/weekly_distance_barplot.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/weekly_distance_barplot.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -445,7 +423,8 @@ def plot_drive_vs_pause_by_weekday(df_trips):
     ax.grid(True, axis='y', linestyle='--', alpha=0.7)
 
     # Save the plot
-    plt.savefig('data/output/figures/temporal_pattern/drive_vs_pause_times_by_weekday.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/drive_vs_pause_times_by_weekday.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/temporal_pattern/drive_vs_pause_times_by_weekday.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -615,8 +594,8 @@ def plot_rest_time_kde(df_stops):
     handles = [genLineLegendHandle(c) for c in colors_locations_2.values()]
     gf_loc.legend_ax.legend(handles=handles[:-1], labels=list(colors_locations_2.keys())[:-1], ncol=3, loc="center")
 
-    gf_loc.fig.savefig(f'data/output/figures/spatial_pattern/rest_time_global.svg', bbox_inches='tight')
-    gf_loc_2.fig.savefig(f'data/output/figures/spatial_pattern/rest_time_detail.svg', bbox_inches='tight')
+    gf_loc.fig.savefig(f'../output/figures/spatial_pattern/rest_time_global.svg', bbox_inches='tight')
+    gf_loc_2.fig.savefig(f'../output/figures/spatial_pattern/rest_time_detail.svg', bbox_inches='tight')
 
 
 # ------------------------------------------------------------------------------
@@ -678,7 +657,8 @@ def plot_data_quality_violin(df_trips):
         ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda t,pos: f"{t:,.1f}".replace('.0','')))
 
     setFontSize(gf.axes_list, 9)
-    plt.savefig('data/output/figures/data_quality.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/data_quality.svg', bbox_inches='tight')
+    plt.savefig('../output/figures/data_quality.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -762,7 +742,8 @@ def plot_fleet_occupation(df_occ, truck_day):
     setFontSize(gridfig.axes_list+[gridfig.legend_ax],9)
 
     # Save figure
-    plt.savefig('data/output/own_figures/temporal_pattern/fleet_occupation.svg')
+    plt.savefig('../output/figures/temporal_pattern/fleet_occupation.svg')
+    plt.savefig('../output/figures/temporal_pattern/fleet_occupation.pdf')
     plt.show()
 
 
@@ -803,6 +784,7 @@ def daily_arrival_pattern(dist_arrival_daily, dist_arrival):
     plt.tight_layout()
 
     # Show the plots
-    plt.savefig('data/output/own_figures/temporal_pattern/daily_arrival_distances.svg')
+    plt.savefig('../output/figures/temporal_pattern/daily_arrival_distances.svg')
+    plt.savefig('../output/figures/temporal_pattern/daily_arrival_distances.pdf')
     plt.show()
 

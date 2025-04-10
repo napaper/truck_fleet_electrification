@@ -33,14 +33,21 @@ alpha_major = 0.8
 alpha_minor = 0.5
 
 def load_data():
-    df_trips_unfiltered = pd.read_csv('input/stations/tracks.csv', index_col='track_id', parse_dates=['start_time', 'stop_time'])
-    df_fleet = pd.read_csv('input/home/fleet.csv', index_col='vehicle_id')
-    zf = zipfile.ZipFile('input/home/speed.zip')
-    return df_trips_unfiltered, df_fleet, zf
+    df_trips_unfiltered = pd.read_csv('../input/tracks.csv', index_col='track_id', parse_dates=['start_time', 'stop_time'])
+    df_fleet = pd.read_csv('../input/fleet.csv', index_col='vehicle_id')
+    return df_trips_unfiltered, df_fleet
 
-def load_speed_data(zf, i_veh, i_trip):
-    df_speed = pd.read_csv(zf.open(f'input/home/speed/{i_veh}/{i_trip}.csv'))
-    return df_speed
+#TODO: Speed wieder einfügen
+
+# def load_data():
+#     df_trips_unfiltered = pd.read_csv('input/tracks.csv', index_col='track_id', parse_dates=['start_time', 'stop_time'])
+#     df_fleet = pd.read_csv('input/fleet.csv', index_col='vehicle_id')
+#     zf = zipfile.ZipFile('input/home/speed.zip')
+#     return df_trips_unfiltered, df_fleet, zf
+
+# def load_speed_data(zf, i_veh, i_trip):
+#     df_speed = pd.read_csv(zf.open(f'input/home/speed/{i_veh}/{i_trip}.csv'))
+#     return df_speed
 
 def preprocess_trips_data(df_trips_unfiltered, df_fleet):
     """
@@ -87,7 +94,8 @@ def seconds_to_time(s):
 #                              GENERAL DESCRIPTION
 # ------------------------------------------------------------------------------
 
-def calculate_meta_data(df_trips_unfiltered, df_trips, df_fleet):
+#def calculate_meta_data(df_trips_unfiltered, df_trips, df_fleet):
+def calculate_meta_data(df_trips_unfiltered, df_trips, df_fleet, fleet_id):
     df_trips['start_time'] = pd.to_datetime(df_trips['start_time'], utc=True)
     df_trips['stop_time'] = pd.to_datetime(df_trips['stop_time'], utc=True)
     
@@ -495,7 +503,7 @@ def aggregate_tours(df_trips):
         **{col: 'max' for col in df_trips.columns if col not in ['distance', 'distance_km', 'duration', 'duration_h', 'start_time', 'tour_id']}
     }).reset_index()
 
-    df_tours.to_csv('input/stations/tours.csv', index=False)
+    df_tours.to_csv('../input/tours.csv', index=False)
     return df_tours
 
 
