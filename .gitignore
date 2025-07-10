@@ -1,0 +1,6 @@
+input/home/speed/*
+speed.zip
+.ipynb_checkpoints/*
+input/data.zip
+**/*.svg
+**/*.png
