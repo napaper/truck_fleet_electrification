@@ -1,1 +1,0 @@
-SELECT track_id, track_id_new FROM spirite.anon_track_id;

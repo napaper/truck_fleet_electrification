@@ -1,9 +1,0 @@
-geopandas
-matplotlib
-numpy
-pandas==2.0.2
-psycopg2_binary==2.9.6
-scipy==1.10.1
-Shapely
-SQLAlchemy==2.0.15
-joblib
