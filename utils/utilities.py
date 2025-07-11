@@ -2,7 +2,7 @@ import pandas as pd
 import sqlalchemy
 import joblib
 import geopandas as gpd
-import config.config as config
+from utils import config
 from typing import Union
 
 from shapely import wkb

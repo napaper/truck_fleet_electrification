@@ -4,3 +4,5 @@ speed.zip
 input/data.zip
 **/*.svg
 **/*.png
+**/config.py
+**/__pycache__/
