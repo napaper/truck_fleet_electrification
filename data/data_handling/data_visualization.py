@@ -488,6 +488,12 @@ def verify_weekday_aggregation(df_trips):
         print(sample_data)
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import pandas as pd
+import matplotlib.lines as mlines
+
 def plot_weekly_distance_boxplot(df_trips):
     """
     Creates a figure with a central boxplot showing all freight forwarders' data together
@@ -536,6 +542,11 @@ def plot_weekly_distance_boxplot(df_trips):
     # Get unique freight forwarders
     freight_forwarders = sorted(df_trips['freight_forwarder'].unique())
     
+    # Determine global y-axis limits
+    all_distances = daily_distance['distance_km'].values
+    y_min = 0  # Start from 0 as per original code
+    y_max = max(all_distances.max(), 1)  # Ensure at least 1 km for visibility, use max of all data
+    
     # Prepare data for the central plot
     all_boxplot_data = []
     for weekday in range(7):
@@ -569,7 +580,7 @@ def plot_weekly_distance_boxplot(df_trips):
     central_ax.tick_params(axis='x', labelsize=12 * scaling_factor)
     central_ax.tick_params(axis='y', labelsize=12 * scaling_factor)
     central_ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
-    central_ax.set_ylim(bottom=0)
+    central_ax.set_ylim(bottom=y_min, top=y_max)  # Apply global y-axis limits
     
     # Assign colors to the central boxplots (7 weekdays + average)
     for i, (box, color) in enumerate(zip(bp_central['boxes'], weekday_colors + [avg_color])):
@@ -657,8 +668,8 @@ def plot_weekly_distance_boxplot(df_trips):
         # Add grid
         axes[i].grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
         
-        # Set y-axis limit
-        axes[i].set_ylim(bottom=0)
+        # Set y-axis limit to match global scale
+        axes[i].set_ylim(bottom=y_min, top=y_max)
         
         # Customize spines
         for spine in axes[i].spines.values():
@@ -731,11 +742,13 @@ def plot_tour_duration_distance_ecdf(df_trips, max_distance=800, max_duration=30
     ax1 = fig.add_subplot(plot_gs[0])
     ax2 = fig.add_subplot(plot_gs[1])
     
-    # Create a color mapping for freight forwarders
+    # Create a color and linestyle mapping for freight forwarders
     freight_forwarders = sorted(tour_aggregates['freight_forwarder'].unique())
     ff_colors = {}
+    ff_linestyles = {}
     for i, ff in enumerate(freight_forwarders):
         ff_colors[ff] = colors_plot[i % len(colors_plot)]
+        ff_linestyles[ff] = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (1, 1))][i % 6]  # Cycle through 6 linestyles
     
     # Keep track of handles for the legend
     handles = []
@@ -752,6 +765,7 @@ def plot_tour_duration_distance_ecdf(df_trips, max_distance=800, max_duration=30
             color=ff_colors[ff],
             ax=ax1,
             linewidth=2,
+            linestyle=ff_linestyles[ff],  # Add linestyle variation
             label=f'FF {ff}'
         )
         
@@ -761,11 +775,12 @@ def plot_tour_duration_distance_ecdf(df_trips, max_distance=800, max_duration=30
             x='distance_km',
             color=ff_colors[ff],
             ax=ax2,
-            linewidth=2
+            linewidth=2,
+            linestyle=ff_linestyles[ff]  # Add linestyle variation
         )
         
-        # Add handle for legend (only need to do this once per freight forwarder)
-        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2))
+        # Add handle for legend (include linestyle)
+        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2, linestyle=ff_linestyles[ff]))
         labels.append(f'FF {ff}')
     
     # Set titles and labels
@@ -882,11 +897,13 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
     ax2 = fig.add_subplot(plot_gs[1])
     axes = [ax1, ax2]
     
-    # Create a color mapping for freight forwarders
+    # Create a color and linestyle mapping for freight forwarders
     freight_forwarders = sorted(tour_aggregates['freight_forwarder'].unique())
     ff_colors = {}
+    ff_linestyles = {}
     for i, ff in enumerate(freight_forwarders):
         ff_colors[ff] = colors_plot[i % len(colors_plot)]
+        ff_linestyles[ff] = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (1, 1))][i % 6]  # Cycle through 6 linestyles
     
     # Create palette that assigns colors based on freight forwarder
     palette = {vehicle_id: ff_colors[ff] for vehicle_id, ff in 
@@ -923,7 +940,8 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
             color=ff_colors[ff],
             ax=axes[0],
             label=f'FF {ff}',
-            weights=duration_weights  # Use weights for percentage
+            weights=duration_weights,  # Use weights for percentage
+            linestyle=ff_linestyles[ff]  # Add linestyle variation
         )
         
         # Distance histogram - use filtered data for visualization only
@@ -939,11 +957,12 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
             fill=False,
             color=ff_colors[ff],
             ax=axes[1],
-            weights=distance_weights  # Use weights for percentage
+            weights=distance_weights,  # Use weights for percentage
+            linestyle=ff_linestyles[ff]  # Add linestyle variation
         )
         
-        # Add handle for legend (only need to do this once per freight forwarder)
-        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2))
+        # Add handle for legend (include linestyle)
+        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2, linestyle=ff_linestyles[ff]))
         labels.append(f'FF {ff}')
     
     # Set titles and labels
@@ -998,7 +1017,7 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
     plt.savefig('data/output/figures/operational/tour_duration_and_distance_hist.svg', bbox_inches='tight')
     plt.savefig('data/output/figures/operational/tour_duration_and_distance_hist.pdf', bbox_inches='tight')
 
-    plt.show()   
+    plt.show()
 
     
 # -------------------------------------------------------------------------------------------
