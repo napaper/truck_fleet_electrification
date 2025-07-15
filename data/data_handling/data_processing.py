@@ -474,51 +474,51 @@ def convert_speed_to_kmh(df_speed):
     return df_speed
 
 
-def calculate_occupation(df_trips):
-    # ! Output is not actually used anywhere !
-    # TODO delete?? Not used and i think it is not correct
-    # Creates 2x the amount of rows as the original df_trips (as it adds a new occupation between each trip (occupation = driving))
+# def calculate_occupation(df_trips):
+#     # ! Output is not actually used anywhere !
+#     # TODO delete?? Not used and i think it is not correct
+#     # Creates 2x the amount of rows as the original df_trips (as it adds a new occupation between each trip (occupation = driving))
 
-    df_occupation = df_trips[['vehicle_id', 'start_time', 'stop_time']].copy()
-    df_occupation.rename(columns={'start_time': 'stop_time', 'stop_time': 'start_time'}, inplace=True)
+#     df_occupation = df_trips[['vehicle_id', 'start_time', 'stop_time']].copy()
+#     df_occupation.rename(columns={'start_time': 'stop_time', 'stop_time': 'start_time'}, inplace=True)
     
-    for loc in [*LOCATIONS, 'other_area']:
-        if loc not in df_trips.columns:
-            df_trips[loc] = False
+#     for loc in [*LOCATIONS, 'other_area']:
+#         if loc not in df_trips.columns:
+#             df_trips[loc] = False
 
-    df_occupation = df_occupation.assign(occupation=df_trips[[*LOCATIONS, 'other_area']].idxmax(axis=1))
+#     df_occupation = df_occupation.assign(occupation=df_trips[[*LOCATIONS, 'other_area']].idxmax(axis=1))
 
-    df_driving_occupation = df_trips[['vehicle_id', 'start_time', 'stop_time']].copy()
-    df_driving_occupation['occupation'] = 'driving'
+#     df_driving_occupation = df_trips[['vehicle_id', 'start_time', 'stop_time']].copy()
+#     df_driving_occupation['occupation'] = 'driving'
 
-    df_occupation = pd.concat([df_occupation, df_driving_occupation.reset_index(drop=True)])
-    #df_occupation = df_occupation.append(df_driving_occupation.reset_index(drop=True))
+#     df_occupation = pd.concat([df_occupation, df_driving_occupation.reset_index(drop=True)])
+#     #df_occupation = df_occupation.append(df_driving_occupation.reset_index(drop=True))
 
-    df_occupation['start_time'] = pd.to_datetime(df_occupation['start_time'], utc=True)
-    df_occupation['stop_time'] = pd.to_datetime(df_occupation['stop_time'], utc=True)
+#     df_occupation['start_time'] = pd.to_datetime(df_occupation['start_time'], utc=True)
+#     df_occupation['stop_time'] = pd.to_datetime(df_occupation['stop_time'], utc=True)
 
-    df_occupation['duration'] = df_occupation.stop_time - df_occupation.start_time
-    df_occupation['duration'] = df_occupation.duration.dt.total_seconds() / 3600
+#     df_occupation['duration'] = df_occupation.stop_time - df_occupation.start_time
+#     df_occupation['duration'] = df_occupation.duration.dt.total_seconds() / 3600
     
-    df_occupation.set_index('start_time', inplace=True)
-    df_occupation = df_occupation.tz_convert('Europe/Berlin') # This does only converts the timezone of the index (start_time)!!
+#     df_occupation.set_index('start_time', inplace=True)
+#     df_occupation = df_occupation.tz_convert('Europe/Berlin') # This does only converts the timezone of the index (start_time)!!
 
-    return df_occupation
+#     return df_occupation
 
 
-def prepare_occupation_data(df_occupation):
-    # out of date?? (No used in the original repo)
-    resampled = df_occupation.groupby(['vehicle_id']).resample('1min').ffill()[['occupation', 'duration']]
-    resampled = resampled.reset_index()
+# def prepare_occupation_data(df_occupation):
+#     # out of date?? (No used in the original repo)
+#     resampled = df_occupation.groupby(['vehicle_id']).resample('1min').ffill()[['occupation', 'duration']]
+#     resampled = resampled.reset_index()
 
-    resampled['dow'] = resampled.start_time.dt.dayofweek
-    resampled['hour'] = resampled.start_time.dt.hour
-    resampled = resampled.loc[resampled.dow < 6] # only week days
-    resampled = resampled.loc[resampled.duration < 24] # remove very long stays
+#     resampled['dow'] = resampled.start_time.dt.dayofweek
+#     resampled['hour'] = resampled.start_time.dt.hour
+#     resampled = resampled.loc[resampled.dow < 6] # only week days
+#     resampled = resampled.loc[resampled.duration < 24] # remove very long stays
 
-    truck_day = resampled.groupby(['occupation', 'hour']).occupation.count()
-    truck_day = truck_day.unstack(level=-1, fill_value=0)
-    return truck_day
+#     truck_day = resampled.groupby(['occupation', 'hour']).occupation.count()
+#     truck_day = truck_day.unstack(level=-1, fill_value=0)
+#     return truck_day
 
 
 def resample_occupation_data(df_stops, df_trips):
@@ -1026,7 +1026,13 @@ def avg_departure_and_arrival():
     for ff, group in freight_forwarder_groups:
         print(f"Freight Forwarder: {ff}")
         avg_start, avg_stop = calculate_average_times(group)
-        
+
+
+# ------------------------------------------------------------------------------
+#                  SCENARIO 2 - No DISPOSITION - INPUT GENERATION
+# ------------------------------------------------------------------------------
+
+
 def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
     """
     Adds battery energy, state of charge (SoC), and energy recharged columns to the activities dataframe. 
@@ -1159,14 +1165,6 @@ def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
     df.to_csv(f"data/output/track_energies/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}_no_disp.csv", index=False)
     
     return df
-
-
-
-# ------------------------------------------------------------------------------
-#                              SPATIAL PATTERN
-# ------------------------------------------------------------------------------
-
-
 
 
 # ------------------------------------------------------------------------------

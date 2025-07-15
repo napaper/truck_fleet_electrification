@@ -65,9 +65,6 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
         print(f"Processing cid: {cid}")
         # Filter data for current cid
         df_cid = df[df['cid'] == cid].copy()
-
-        # TODO: Wenn Entscheidung für Hochsaklierung auf gesamte Flotte - hier Skalierungsfaktor holen (angenommen scaling_factors ist Parameter)
-        # scale = scaling_factors.get(freight_forwarder, 1.0)  # z.B. aus dict {1: 2.5, 2: 1.0, ...}
         
         if len(df_cid) == 0:
             continue
@@ -87,14 +84,12 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
         # Create intermediate dataframe for tracking charging packages
         intermediate_df = pd.DataFrame(index=time_range)
         
-        # Process each charging session --> each tour is looked at individually / no cumulative SoC is being calculated resulting out of the connection of multiple tours (historic dispatch)
+        # Process each charging session
         for idx, row in df_cid.iterrows():
             arrival = row['stop_time']
             
             # For tracks that require public charging to be completed, assume that the trucks arrives with its min SoC
             energy_demand = min(row['energy_consumption_kwh_cleaned'] - row['energy_recharged_kwh'], threshold)
-            # TODO: Wenn Entscheidung für Hochsaklierung auf gesamte Flotte - hier Skalierungsfaktor anwenden
-            # energy_demand *= scale oder so
 
             if row['energy_consumption_kwh_cleaned'] - row['energy_recharged_kwh'] > threshold:
                 public_energy += row['energy_consumption_kwh_cleaned'] - row['energy_recharged_kwh'] - threshold 
@@ -118,7 +113,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
             # Create a series representing this charging package
             charging_package = pd.Series(
                 index=pd.date_range(start=arrival, end=end_charging_time - pd.Timedelta(minutes=1), freq='1min'),
-                data=charging_power # TODO:  Wenn Hochskalierungung : data=charging_power * scale  # Oder hier skalieren für simultane Loads
+                data=charging_power
             )
             
             # Add this package as a new column to intermediate dataframe

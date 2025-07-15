@@ -488,12 +488,6 @@ def verify_weekday_aggregation(df_trips):
         print(sample_data)
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import pandas as pd
-import matplotlib.lines as mlines
-
 def plot_weekly_distance_boxplot(df_trips):
     """
     Creates a figure with a central boxplot showing all freight forwarders' data together
@@ -542,11 +536,6 @@ def plot_weekly_distance_boxplot(df_trips):
     # Get unique freight forwarders
     freight_forwarders = sorted(df_trips['freight_forwarder'].unique())
     
-    # Determine global y-axis limits
-    all_distances = daily_distance['distance_km'].values
-    y_min = 0  # Start from 0 as per original code
-    y_max = max(all_distances.max(), 1)  # Ensure at least 1 km for visibility, use max of all data
-    
     # Prepare data for the central plot
     all_boxplot_data = []
     for weekday in range(7):
@@ -580,7 +569,7 @@ def plot_weekly_distance_boxplot(df_trips):
     central_ax.tick_params(axis='x', labelsize=12 * scaling_factor)
     central_ax.tick_params(axis='y', labelsize=12 * scaling_factor)
     central_ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
-    central_ax.set_ylim(bottom=y_min, top=y_max)  # Apply global y-axis limits
+    central_ax.set_ylim(bottom=0)
     
     # Assign colors to the central boxplots (7 weekdays + average)
     for i, (box, color) in enumerate(zip(bp_central['boxes'], weekday_colors + [avg_color])):
@@ -668,8 +657,8 @@ def plot_weekly_distance_boxplot(df_trips):
         # Add grid
         axes[i].grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
         
-        # Set y-axis limit to match global scale
-        axes[i].set_ylim(bottom=y_min, top=y_max)
+        # Set y-axis limit
+        axes[i].set_ylim(bottom=0)
         
         # Customize spines
         for spine in axes[i].spines.values():
@@ -742,13 +731,11 @@ def plot_tour_duration_distance_ecdf(df_trips, max_distance=800, max_duration=30
     ax1 = fig.add_subplot(plot_gs[0])
     ax2 = fig.add_subplot(plot_gs[1])
     
-    # Create a color and linestyle mapping for freight forwarders
+    # Create a color mapping for freight forwarders
     freight_forwarders = sorted(tour_aggregates['freight_forwarder'].unique())
     ff_colors = {}
-    ff_linestyles = {}
     for i, ff in enumerate(freight_forwarders):
         ff_colors[ff] = colors_plot[i % len(colors_plot)]
-        ff_linestyles[ff] = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (1, 1))][i % 6]  # Cycle through 6 linestyles
     
     # Keep track of handles for the legend
     handles = []
@@ -765,7 +752,6 @@ def plot_tour_duration_distance_ecdf(df_trips, max_distance=800, max_duration=30
             color=ff_colors[ff],
             ax=ax1,
             linewidth=2,
-            linestyle=ff_linestyles[ff],  # Add linestyle variation
             label=f'FF {ff}'
         )
         
@@ -775,12 +761,11 @@ def plot_tour_duration_distance_ecdf(df_trips, max_distance=800, max_duration=30
             x='distance_km',
             color=ff_colors[ff],
             ax=ax2,
-            linewidth=2,
-            linestyle=ff_linestyles[ff]  # Add linestyle variation
+            linewidth=2
         )
         
-        # Add handle for legend (include linestyle)
-        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2, linestyle=ff_linestyles[ff]))
+        # Add handle for legend (only need to do this once per freight forwarder)
+        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2))
         labels.append(f'FF {ff}')
     
     # Set titles and labels
@@ -897,13 +882,11 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
     ax2 = fig.add_subplot(plot_gs[1])
     axes = [ax1, ax2]
     
-    # Create a color and linestyle mapping for freight forwarders
+    # Create a color mapping for freight forwarders
     freight_forwarders = sorted(tour_aggregates['freight_forwarder'].unique())
     ff_colors = {}
-    ff_linestyles = {}
     for i, ff in enumerate(freight_forwarders):
         ff_colors[ff] = colors_plot[i % len(colors_plot)]
-        ff_linestyles[ff] = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (1, 1))][i % 6]  # Cycle through 6 linestyles
     
     # Create palette that assigns colors based on freight forwarder
     palette = {vehicle_id: ff_colors[ff] for vehicle_id, ff in 
@@ -940,8 +923,7 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
             color=ff_colors[ff],
             ax=axes[0],
             label=f'FF {ff}',
-            weights=duration_weights,  # Use weights for percentage
-            linestyle=ff_linestyles[ff]  # Add linestyle variation
+            weights=duration_weights  # Use weights for percentage
         )
         
         # Distance histogram - use filtered data for visualization only
@@ -957,12 +939,11 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
             fill=False,
             color=ff_colors[ff],
             ax=axes[1],
-            weights=distance_weights,  # Use weights for percentage
-            linestyle=ff_linestyles[ff]  # Add linestyle variation
+            weights=distance_weights  # Use weights for percentage
         )
         
-        # Add handle for legend (include linestyle)
-        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2, linestyle=ff_linestyles[ff]))
+        # Add handle for legend (only need to do this once per freight forwarder)
+        handles.append(plt.Line2D([0], [0], color=ff_colors[ff], lw=2))
         labels.append(f'FF {ff}')
     
     # Set titles and labels
@@ -1017,7 +998,7 @@ def plot_tour_duration_distance_histogram(df_trips, max_distance=800, max_durati
     plt.savefig('data/output/figures/operational/tour_duration_and_distance_hist.svg', bbox_inches='tight')
     plt.savefig('data/output/figures/operational/tour_duration_and_distance_hist.pdf', bbox_inches='tight')
 
-    plt.show()
+    plt.show()   
 
     
 # -------------------------------------------------------------------------------------------
@@ -1770,238 +1751,238 @@ def plot_fleet_occupation(df_occ, truck_day):
 # ------------------------------------------------------------------------------
 
 
-def plot_weekly_energy_demand_boxplot2(df_loads):
-    """
-    Creates a figure with a central boxplot showing all home bases' energy demand together
-    at the top, and individual plots for each home base (CID) below.
+# def plot_weekly_energy_demand_boxplot2(df_loads):
+#     """
+#     Creates a figure with a central boxplot showing all home bases' energy demand together
+#     at the top, and individual plots for each home base (CID) below.
     
-    Parameters:
-    -----------
-    df_loads : DataFrame
-        DataFrame containing daily energy demand data with day, energy_demand_kwh, cid, and freight_forwarder columns
-    """
+#     Parameters:
+#     -----------
+#     df_loads : DataFrame
+#         DataFrame containing daily energy demand data with day, energy_demand_kwh, cid, and freight_forwarder columns
+#     """
     
-    # Convert day column to datetime and extract weekday
-    df_loads['day'] = pd.to_datetime(df_loads['day'])
-    df_loads['weekday'] = df_loads['day'].dt.weekday  # 0 = Monday, 6 = Sunday
+#     # Convert day column to datetime and extract weekday
+#     df_loads['day'] = pd.to_datetime(df_loads['day'])
+#     df_loads['weekday'] = df_loads['day'].dt.weekday  # 0 = Monday, 6 = Sunday
     
-    # Define plot size
-    textwidth = (159.2 / 25.4)*2.2  # Convert text width from mm to inches
-    h_169 = 9 / 16 * textwidth
-    height = h_169 * 2.5  # Increase height for better readability
-    width = textwidth * 1.2  # Increase width for better layout
+#     # Define plot size
+#     textwidth = (159.2 / 25.4)*2.2  # Convert text width from mm to inches
+#     h_169 = 9 / 16 * textwidth
+#     height = h_169 * 2.5  # Increase height for better readability
+#     width = textwidth * 1.2  # Increase width for better layout
 
-    # Define colors for weekdays and average
-    weekday_colors = {
-        0: colors['TUMBlue4'],  # Monday
-        1: colors['TUMBlue3'],  # Tuesday
-        2: colors['TUMBlue2'],  # Wednesday 
-        3: colors['TUMBlue1'],  # Thursday
-        4: colors['TUMGray3'],  # Friday
-        5: colors['TUMGray2'],  # Saturday 
-        6: colors['TUMGray1'],  # Sunday
-        'Combined': colors['LightPurple']  # Average/Combined column
-    }
+#     # Define colors for weekdays and average
+#     weekday_colors = {
+#         0: colors['TUMBlue4'],  # Monday
+#         1: colors['TUMBlue3'],  # Tuesday
+#         2: colors['TUMBlue2'],  # Wednesday 
+#         3: colors['TUMBlue1'],  # Thursday
+#         4: colors['TUMGray3'],  # Friday
+#         5: colors['TUMGray2'],  # Saturday 
+#         6: colors['TUMGray1'],  # Sunday
+#         'Combined': colors['LightPurple']  # Average/Combined column
+#     }
 
-    # Create subplots with a 3 column x 5 row grid (15 subplots total)
-    fig = plt.figure(figsize=(width, height))
+#     # Create subplots with a 3 column x 5 row grid (15 subplots total)
+#     fig = plt.figure(figsize=(width, height))
     
-    # Add a GridSpec with 5 rows and 3 columns
-    gs = fig.add_gridspec(5, 3, height_ratios=[2, 1, 1, 1, 1])
+#     # Add a GridSpec with 5 rows and 3 columns
+#     gs = fig.add_gridspec(5, 3, height_ratios=[2, 1, 1, 1, 1])
     
-    # Add the central plot at the top, spanning all columns
-    central_ax = fig.add_subplot(gs[0, :])
+#     # Add the central plot at the top, spanning all columns
+#     central_ax = fig.add_subplot(gs[0, :])
     
-    # Create the individual CID axes
-    axes = []
-    for i in range(1, 5):  # Rows 1-4
-        for j in range(3):  # 3 columns
-            ax = fig.add_subplot(gs[i, j])
-            axes.append(ax)
+#     # Create the individual CID axes
+#     axes = []
+#     for i in range(1, 5):  # Rows 1-4
+#         for j in range(3):  # 3 columns
+#             ax = fig.add_subplot(gs[i, j])
+#             axes.append(ax)
     
-    # Get unique CIDs
-    cids = sorted(df_loads['cid'].unique())
+#     # Get unique CIDs
+#     cids = sorted(df_loads['cid'].unique())
     
-    # Prepare data for the central plot
-    all_boxplot_data = []
-    all_weekday_labels = []
-    all_weekday_numbers = []  # Store the actual weekday numbers
+#     # Prepare data for the central plot
+#     all_boxplot_data = []
+#     all_weekday_labels = []
+#     all_weekday_numbers = []  # Store the actual weekday numbers
     
-    for weekday in range(7):
-        weekday_data = df_loads[df_loads['weekday'] == weekday]['energy_demand_kwh'].tolist()
-        if len(weekday_data) > 0:  # Only add if there's data for this weekday
-            all_boxplot_data.append(weekday_data)
-            all_weekday_labels.append(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday])
-            all_weekday_numbers.append(weekday)
+#     for weekday in range(7):
+#         weekday_data = df_loads[df_loads['weekday'] == weekday]['energy_demand_kwh'].tolist()
+#         if len(weekday_data) > 0:  # Only add if there's data for this weekday
+#             all_boxplot_data.append(weekday_data)
+#             all_weekday_labels.append(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday])
+#             all_weekday_numbers.append(weekday)
     
-    # Add the average data for the central plot (all weekdays combined)
-    all_avg_data = df_loads['energy_demand_kwh'].tolist()
-    all_boxplot_data.append(all_avg_data)
-    all_weekday_labels.append('Combined')
-    all_weekday_numbers.append('Combined')
+#     # Add the average data for the central plot (all weekdays combined)
+#     all_avg_data = df_loads['energy_demand_kwh'].tolist()
+#     all_boxplot_data.append(all_avg_data)
+#     all_weekday_labels.append('Combined')
+#     all_weekday_numbers.append('Combined')
     
-    # Create central boxplot with all data
-    scaling_factor = textwidth / 16
-    bp_central = central_ax.boxplot(
-        all_boxplot_data,
-        patch_artist=True,
-        showmeans=True,
-        meanline=True,
-        meanprops=dict(color=colors['TUMGreen3'], linestyle='--', linewidth=1.5 * scaling_factor),
-        medianprops=dict(color=colors['TUMOrange'], linewidth=1.5 * scaling_factor),
-        showfliers=True,
-        flierprops=dict(marker='o', color='red', alpha=0.5, markersize=3),
-        whiskerprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
-        capprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
-        widths=0.55 * scaling_factor,
-        positions=range(len(all_boxplot_data)),
-        labels=all_weekday_labels
-    )
+#     # Create central boxplot with all data
+#     scaling_factor = textwidth / 16
+#     bp_central = central_ax.boxplot(
+#         all_boxplot_data,
+#         patch_artist=True,
+#         showmeans=True,
+#         meanline=True,
+#         meanprops=dict(color=colors['TUMGreen3'], linestyle='--', linewidth=1.5 * scaling_factor),
+#         medianprops=dict(color=colors['TUMOrange'], linewidth=1.5 * scaling_factor),
+#         showfliers=True,
+#         flierprops=dict(marker='o', color='red', alpha=0.5, markersize=3),
+#         whiskerprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#         capprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#         widths=0.55 * scaling_factor,
+#         positions=range(len(all_boxplot_data)),
+#         labels=all_weekday_labels
+#     )
     
-    # Style central boxplot
-    central_ax.set_title('All Home Bases Combined', fontsize=14 * scaling_factor)
-    central_ax.tick_params(axis='x', labelsize=12 * scaling_factor)
-    central_ax.tick_params(axis='y', labelsize=12 * scaling_factor)
-    central_ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
-    central_ax.set_ylim(bottom=0)
+#     # Style central boxplot
+#     central_ax.set_title('All Home Bases Combined', fontsize=14 * scaling_factor)
+#     central_ax.tick_params(axis='x', labelsize=12 * scaling_factor)
+#     central_ax.tick_params(axis='y', labelsize=12 * scaling_factor)
+#     central_ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
+#     central_ax.set_ylim(bottom=0)
     
-    # Add individual axis labels to central plot
-    central_ax.set_xlabel('Weekday', fontsize=12 * scaling_factor)
-    central_ax.set_ylabel('Energy Demand (kWh)', fontsize=12 * scaling_factor)
+#     # Add individual axis labels to central plot
+#     central_ax.set_xlabel('Weekday', fontsize=12 * scaling_factor)
+#     central_ax.set_ylabel('Energy Demand (kWh)', fontsize=12 * scaling_factor)
     
-    # Define legend handles directly in the central plot
-    mean_line = mlines.Line2D([], [], color=colors['TUMGreen3'], linestyle='--', label='Mean', linewidth=3 * scaling_factor)
-    median_line = mlines.Line2D([], [], color=colors['TUMOrange'], label='Median', linewidth=3 * scaling_factor)
-    # Add the legend to the top left corner of the central plot
-    central_ax.legend(handles=[median_line, mean_line], loc='upper left', fontsize=12 * scaling_factor, frameon=True, ncol=2)
+#     # Define legend handles directly in the central plot
+#     mean_line = mlines.Line2D([], [], color=colors['TUMGreen3'], linestyle='--', label='Mean', linewidth=3 * scaling_factor)
+#     median_line = mlines.Line2D([], [], color=colors['TUMOrange'], label='Median', linewidth=3 * scaling_factor)
+#     # Add the legend to the top left corner of the central plot
+#     central_ax.legend(handles=[median_line, mean_line], loc='upper left', fontsize=12 * scaling_factor, frameon=True, ncol=2)
     
-    # Assign colors to the central boxplots based on weekday or 'Combined'
-    for i, (box, weekday_or_combined) in enumerate(zip(bp_central['boxes'], all_weekday_numbers)):
-        box.set_facecolor(weekday_colors[weekday_or_combined])
-        # Add a slightly thicker border to the average box to make it stand out
-        if weekday_or_combined == 'Combined':  # Average box
-            box.set(linewidth=2.0 * scaling_factor)
+#     # Assign colors to the central boxplots based on weekday or 'Combined'
+#     for i, (box, weekday_or_combined) in enumerate(zip(bp_central['boxes'], all_weekday_numbers)):
+#         box.set_facecolor(weekday_colors[weekday_or_combined])
+#         # Add a slightly thicker border to the average box to make it stand out
+#         if weekday_or_combined == 'Combined':  # Average box
+#             box.set(linewidth=2.0 * scaling_factor)
     
-    # Annotate central plot median values
-    for n, (median_feature, demands) in enumerate(zip(bp_central['medians'], all_boxplot_data)):
-        demands_series = pd.Series(demands)
-        median_value = demands_series.median()
-        x_median, y_median = median_feature.get_xydata()[1]
-        central_ax.text(x_median, y_median, f'{median_value:.2f}', 
-                horizontalalignment='center', color=colors['TUMBlack'], fontsize=10 * scaling_factor, 
-                bbox=dict(boxstyle='round', pad=0.3 * scaling_factor, facecolor=colors['TUMWhite'], 
-                        edgecolor=colors['TUMOrange'], alpha=0.9))
+#     # Annotate central plot median values
+#     for n, (median_feature, demands) in enumerate(zip(bp_central['medians'], all_boxplot_data)):
+#         demands_series = pd.Series(demands)
+#         median_value = demands_series.median()
+#         x_median, y_median = median_feature.get_xydata()[1]
+#         central_ax.text(x_median, y_median, f'{median_value:.2f}', 
+#                 horizontalalignment='center', color=colors['TUMBlack'], fontsize=10 * scaling_factor, 
+#                 bbox=dict(boxstyle='round', pad=0.3 * scaling_factor, facecolor=colors['TUMWhite'], 
+#                         edgecolor=colors['TUMOrange'], alpha=0.9))
     
-    # Process each CID for individual plots
-    for i, cid in enumerate(cids):
-        if i >= len(axes):
-            break
+#     # Process each CID for individual plots
+#     for i, cid in enumerate(cids):
+#         if i >= len(axes):
+#             break
             
-        # Filter data for current CID
-        cid_data = df_loads[df_loads['cid'] == cid]
+#         # Filter data for current CID
+#         cid_data = df_loads[df_loads['cid'] == cid]
         
-        # Get the freight forwarder for this CID
-        ff = cid_data['freight_forwarder'].iloc[0] if not cid_data.empty else "Unknown"
+#         # Get the freight forwarder for this CID
+#         ff = cid_data['freight_forwarder'].iloc[0] if not cid_data.empty else "Unknown"
         
-        # Calculate and print daily energy demand per home base
-        print(f"\nHome Base CID {cid} - Daily Energy Demand:")
-        weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        daily_stats = cid_data.groupby('weekday')['energy_demand_kwh'].agg(['mean', 'std', 'median', 'count']).reset_index()
-        daily_stats['weekday_name'] = daily_stats['weekday'].apply(lambda x: weekday_names[x])
-        print(daily_stats[['weekday_name', 'mean', 'std', 'median', 'count']])
-        print(f"Overall mean: {cid_data['energy_demand_kwh'].mean():.2f} kWh")
+#         # Calculate and print daily energy demand per home base
+#         print(f"\nHome Base CID {cid} - Daily Energy Demand:")
+#         weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+#         daily_stats = cid_data.groupby('weekday')['energy_demand_kwh'].agg(['mean', 'std', 'median', 'count']).reset_index()
+#         daily_stats['weekday_name'] = daily_stats['weekday'].apply(lambda x: weekday_names[x])
+#         print(daily_stats[['weekday_name', 'mean', 'std', 'median', 'count']])
+#         print(f"Overall mean: {cid_data['energy_demand_kwh'].mean():.2f} kWh")
         
-        # Prepare boxplot data with only available weekdays
-        boxplot_data = []
-        weekday_labels = []
-        weekday_numbers = []  # Store the actual weekday numbers
+#         # Prepare boxplot data with only available weekdays
+#         boxplot_data = []
+#         weekday_labels = []
+#         weekday_numbers = []  # Store the actual weekday numbers
         
-        for weekday in range(7):
-            weekday_data = cid_data[cid_data['weekday'] == weekday]['energy_demand_kwh'].tolist()
-            if len(weekday_data) > 0:  # Only add if there's data for this weekday
-                boxplot_data.append(weekday_data)
-                weekday_labels.append(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday])
-                weekday_numbers.append(weekday)
+#         for weekday in range(7):
+#             weekday_data = cid_data[cid_data['weekday'] == weekday]['energy_demand_kwh'].tolist()
+#             if len(weekday_data) > 0:  # Only add if there's data for this weekday
+#                 boxplot_data.append(weekday_data)
+#                 weekday_labels.append(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday])
+#                 weekday_numbers.append(weekday)
         
-        # Add the average data for this CID (all weekdays combined)
-        avg_data = cid_data['energy_demand_kwh'].tolist()
-        boxplot_data.append(avg_data)
-        weekday_labels.append('Combined')
-        weekday_numbers.append('Combined')
+#         # Add the average data for this CID (all weekdays combined)
+#         avg_data = cid_data['energy_demand_kwh'].tolist()
+#         boxplot_data.append(avg_data)
+#         weekday_labels.append('Combined')
+#         weekday_numbers.append('Combined')
         
-        # Create boxplot
-        bp = axes[i].boxplot(
-            boxplot_data,
-            patch_artist=True,
-            showmeans=True,
-            meanline=True,
-            meanprops=dict(color=colors['TUMGreen3'], linestyle='--', linewidth=1.5 * scaling_factor),
-            medianprops=dict(color=colors['TUMOrange'], linewidth=1.5 * scaling_factor),
-            showfliers=True,
-            flierprops=dict(marker='o', color='red', alpha=0.5, markersize=3),
-            whiskerprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
-            capprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
-            widths=0.55 * scaling_factor,
-            positions=range(len(boxplot_data)),
-            labels=weekday_labels
-        )
+#         # Create boxplot
+#         bp = axes[i].boxplot(
+#             boxplot_data,
+#             patch_artist=True,
+#             showmeans=True,
+#             meanline=True,
+#             meanprops=dict(color=colors['TUMGreen3'], linestyle='--', linewidth=1.5 * scaling_factor),
+#             medianprops=dict(color=colors['TUMOrange'], linewidth=1.5 * scaling_factor),
+#             showfliers=True,
+#             flierprops=dict(marker='o', color='red', alpha=0.5, markersize=3),
+#             whiskerprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#             capprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#             widths=0.55 * scaling_factor,
+#             positions=range(len(boxplot_data)),
+#             labels=weekday_labels
+#         )
         
-        # Set x-axis and y-axis tick labels font size
-        axes[i].tick_params(axis='x', labelsize=10 * scaling_factor)
-        axes[i].tick_params(axis='y', labelsize=10 * scaling_factor)
+#         # Set x-axis and y-axis tick labels font size
+#         axes[i].tick_params(axis='x', labelsize=10 * scaling_factor)
+#         axes[i].tick_params(axis='y', labelsize=10 * scaling_factor)
         
-        # Add individual axis labels to each subplot
-        axes[i].set_xlabel('Weekday', fontsize=12 * scaling_factor)
-        axes[i].set_ylabel('Energy Demand (kWh)', fontsize=12 * scaling_factor)
+#         # Add individual axis labels to each subplot
+#         axes[i].set_xlabel('Weekday', fontsize=12 * scaling_factor)
+#         axes[i].set_ylabel('Energy Demand (kWh)', fontsize=12 * scaling_factor)
         
-        # Annotate median values
-        for n, (median_feature, demands) in enumerate(zip(bp['medians'], boxplot_data)):
-            demands_series = pd.Series(demands)
-            median_value = demands_series.median()
-            x_median, y_median = median_feature.get_xydata()[1]
-            axes[i].text(x_median, y_median, f'{median_value:.2f}', 
-                    horizontalalignment='center', color=colors['TUMBlack'], fontsize=8 * scaling_factor, 
-                    bbox=dict(boxstyle='round', pad=0.3 * scaling_factor, facecolor=colors['TUMWhite'], 
-                            edgecolor=colors['TUMOrange'], alpha=0.9))
+#         # Annotate median values
+#         for n, (median_feature, demands) in enumerate(zip(bp['medians'], boxplot_data)):
+#             demands_series = pd.Series(demands)
+#             median_value = demands_series.median()
+#             x_median, y_median = median_feature.get_xydata()[1]
+#             axes[i].text(x_median, y_median, f'{median_value:.2f}', 
+#                     horizontalalignment='center', color=colors['TUMBlack'], fontsize=8 * scaling_factor, 
+#                     bbox=dict(boxstyle='round', pad=0.3 * scaling_factor, facecolor=colors['TUMWhite'], 
+#                             edgecolor=colors['TUMOrange'], alpha=0.9))
         
-        # Assign colors to the boxplots based on weekday or 'Combined'
-        for j, (box, weekday_or_combined) in enumerate(zip(bp['boxes'], weekday_numbers)):
-            box.set_facecolor(weekday_colors[weekday_or_combined])
-            # Add a slightly thicker border to the average box to make it stand out
-            if weekday_or_combined == 'Combined':  # Average box
-                box.set(linewidth=2.0 * scaling_factor)
+#         # Assign colors to the boxplots based on weekday or 'Combined'
+#         for j, (box, weekday_or_combined) in enumerate(zip(bp['boxes'], weekday_numbers)):
+#             box.set_facecolor(weekday_colors[weekday_or_combined])
+#             # Add a slightly thicker border to the average box to make it stand out
+#             if weekday_or_combined == 'Combined':  # Average box
+#                 box.set(linewidth=2.0 * scaling_factor)
         
-        # Set title for each subplot with both freight forwarder and CID
-        axes[i].set_title(f'Freight Forwarder {ff} - Home Base CID {cid}', fontsize=12 * scaling_factor)
-        # Add legend to each plot in the top right corner
-        axes[i].legend(handles=[median_line, mean_line], loc='upper left', fontsize=11 * scaling_factor, frameon=True, ncol=2)
-        # Add grid
-        axes[i].grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
+#         # Set title for each subplot with both freight forwarder and CID
+#         axes[i].set_title(f'Freight Forwarder {ff} - Home Base CID {cid}', fontsize=12 * scaling_factor)
+#         # Add legend to each plot in the top right corner
+#         axes[i].legend(handles=[median_line, mean_line], loc='upper left', fontsize=11 * scaling_factor, frameon=True, ncol=2)
+#         # Add grid
+#         axes[i].grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
         
-        # Set y-axis limit
-        axes[i].set_ylim(bottom=0)
+#         # Set y-axis limit
+#         axes[i].set_ylim(bottom=0)
         
-        # Customize spines
-        for spine in axes[i].spines.values():
-            spine.set_edgecolor(colors['TUMBlack'])
-            spine.set_linewidth(0.8 * scaling_factor)
+#         # Customize spines
+#         for spine in axes[i].spines.values():
+#             spine.set_edgecolor(colors['TUMBlack'])
+#             spine.set_linewidth(0.8 * scaling_factor)
     
-    # Remove any empty subplots if there are fewer than 12 CIDs
-    for i in range(len(cids), len(axes)):
-        fig.delaxes(axes[i])
+#     # Remove any empty subplots if there are fewer than 12 CIDs
+#     for i in range(len(cids), len(axes)):
+#         fig.delaxes(axes[i])
     
-    # Still add common labels as a reference, but they'll be less necessary with individual labels
-    fig.text(0.5, 0.01, 'Weekday', ha='center', va='center', fontsize=16 * scaling_factor)
-    fig.text(0.01, 0.5, 'Energy Demand (kWh)', ha='center', va='center', rotation='vertical', fontsize=16 * scaling_factor)
+#     # Still add common labels as a reference, but they'll be less necessary with individual labels
+#     fig.text(0.5, 0.01, 'Weekday', ha='center', va='center', fontsize=16 * scaling_factor)
+#     fig.text(0.01, 0.5, 'Energy Demand (kWh)', ha='center', va='center', rotation='vertical', fontsize=16 * scaling_factor)
 
-    plt.tight_layout(rect=[0.02, 0.03, 1, 0.95])  # Adjust layout to make room for common labels
-    plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.svg', bbox_inches='tight')
-    plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.pdf', bbox_inches='tight')
-    plt.show()
+#     plt.tight_layout(rect=[0.02, 0.03, 1, 0.95])  # Adjust layout to make room for common labels
+#     plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.svg', bbox_inches='tight')
+#     plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.pdf', bbox_inches='tight')
+#     plt.show()
 
 
 # ------------------------------------------------------------------------------
-#                             FLEET OCCUPATION PLOT
+#                             WEEKLY ENERGY DEMAND BOXPLOT
 # ------------------------------------------------------------------------------
 
 
@@ -2010,7 +1991,7 @@ def plot_weekly_energy_demand_boxplot(df_loads):
     Creates a figure with a central boxplot showing all home bases' energy demand together
     at the top, and individual plots for each home base (CID) below.
     
-    Parameters:
+    Parameters:plot_weekly_energy_demand_boxplot(daily_demands)
     -----------
     df_loads : DataFrame
         DataFrame containing daily energy demand data with day, energy_demand_kwh, cid, and freight_forwarder columns
@@ -2023,7 +2004,7 @@ def plot_weekly_energy_demand_boxplot(df_loads):
     # Define plot size
     textwidth = (159.2 / 25.4)*2.2  # Convert text width from mm to inches
     h_169 = 9 / 16 * textwidth
-    height = h_169 * 2  # Increase height for better readability
+    height = h_169 * 2.85  # Increase height for better readability
     width = textwidth * 1.2  # Increase width for better layout
 
     # Define colors for weekdays and average
@@ -2217,13 +2198,243 @@ def plot_weekly_energy_demand_boxplot(df_loads):
         fig.delaxes(axes[i])
     
     # Add common labels
-    fig.text(0.5, 0.01, 'Weekday', ha='center', va='center', fontsize=16 * scaling_factor)
+    #fig.text(0.5, 0.01, 'Weekday', ha='center', va='center', fontsize=16 * scaling_factor)
+    #fig.text(0.5, 0.01, 'HALLO', ha='center', va='center', fontsize=16 * scaling_factor)
     fig.text(0.01, 0.5, 'Energy Demand / kWh', ha='center', va='center', rotation='vertical', fontsize=16 * scaling_factor)
 
     plt.tight_layout(rect=[0.02, 0.03, 1, 0.95])  # Adjust layout to make room for common labels
     plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.svg', bbox_inches='tight')
     plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.pdf', bbox_inches='tight')
     plt.show()
+
+
+# ------------------------------------------------------------------------------------------------
+#                 WEEKLY ENERGY DEMAND BOXPLOT - SAME PLOT WITH EQUALLY SCALED Y-AXES
+# ------------------------------------------------------------------------------------------------
+
+
+# def plot_weekly_energy_demand_boxplot(df_loads):
+#     """
+#     Creates a figure with a central boxplot showing all home bases' energy demand together
+#     at the top, and individual plots for each home base (CID) below.
+    
+#     Parameters:plot_weekly_energy_demand_boxplot(daily_demands)
+#     -----------
+#     df_loads : DataFrame
+#         DataFrame containing daily energy demand data with day, energy_demand_kwh, cid, and freight_forwarder columns
+#     """
+    
+#     # Convert day column to datetime and extract weekday
+#     df_loads['day'] = pd.to_datetime(df_loads['day'])
+#     df_loads['weekday'] = df_loads['day'].dt.weekday  # 0 = Monday, 6 = Sunday
+    
+#     # Define plot size
+#     textwidth = (159.2 / 25.4)*2.2  # Convert text width from mm to inches
+#     h_169 = 9 / 16 * textwidth
+#     height = h_169 * 2  # Increase height for better readability
+#     width = textwidth * 1.2  # Increase width for better layout
+
+#     # Define colors for weekdays and average
+#     weekday_colors = {
+#         0: colors['TUMBlue4'],  # Monday
+#         1: colors['TUMBlue3'],  # Tuesday
+#         2: colors['TUMBlue2'],  # Wednesday 
+#         3: colors['TUMBlue1'],  # Thursday
+#         4: colors['TUMGray3'],  # Friday
+#         5: colors['TUMGray2'],  # Saturday 
+#         6: colors['TUMGray1'],  # Sunday
+#         'Combined': colors['LightPurple']  # Average/Combined column
+#     }
+
+#     # Create subplots with a 3 column x 5 row grid (15 subplots total)
+#     fig = plt.figure(figsize=(width, height))
+    
+#     # Add a GridSpec with 5 rows and 3 columns
+#     gs = fig.add_gridspec(5, 3, height_ratios=[2, 1, 1, 1, 1])
+    
+#     # Add the central plot at the top, spanning all columns
+#     central_ax = fig.add_subplot(gs[0, :])
+    
+#     # Create the individual CID axes
+#     axes = []
+#     for i in range(1, 5):  # Rows 1-4
+#         for j in range(3):  # 3 columns
+#             ax = fig.add_subplot(gs[i, j])
+#             axes.append(ax)
+    
+#     # Get unique CIDs
+#     cids = sorted(df_loads['cid'].unique())
+    
+#     # Prepare data for the central plot
+#     all_boxplot_data = []
+#     all_weekday_labels = []
+#     all_weekday_numbers = []  # Store the actual weekday numbers
+    
+#     for weekday in range(7):
+#         weekday_data = df_loads[df_loads['weekday'] == weekday]['energy_demand_kwh'].tolist()
+#         if len(weekday_data) > 0:  # Only add if there's data for this weekday
+#             all_boxplot_data.append(weekday_data)
+#             all_weekday_labels.append(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday])
+#             all_weekday_numbers.append(weekday)
+    
+#     # Add the average data for the central plot (all weekdays combined)
+#     all_avg_data = df_loads['energy_demand_kwh'].tolist()
+#     all_boxplot_data.append(all_avg_data)
+#     all_weekday_labels.append('Combined')
+#     all_weekday_numbers.append('Combined')
+    
+#     # Create central boxplot with all data
+#     scaling_factor = textwidth / 16
+#     bp_central = central_ax.boxplot(
+#         all_boxplot_data,
+#         patch_artist=True,
+#         showmeans=True,
+#         meanline=True,
+#         meanprops=dict(color=colors['TUMGreen3'], linestyle='--', linewidth=1.5 * scaling_factor),
+#         medianprops=dict(color=colors['TUMOrange'], linewidth=1.5 * scaling_factor),
+#         showfliers=True,
+#         flierprops=dict(marker='o', color='red', alpha=0.5, markersize=3),
+#         whiskerprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#         capprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#         widths=0.55 * scaling_factor,
+#         positions=range(len(all_boxplot_data)),
+#         labels=all_weekday_labels
+#     )
+    
+#     # Style central boxplot
+#     central_ax.set_title('All Home Bases Combined', fontsize=14 * scaling_factor)
+#     central_ax.tick_params(axis='x', labelsize=12 * scaling_factor)
+#     central_ax.tick_params(axis='y', labelsize=12 * scaling_factor)
+#     central_ax.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
+#     central_ax.set_ylim(bottom=0)
+    
+#     # Define legend handles directly in the central plot
+#     mean_line = mlines.Line2D([], [], color=colors['TUMGreen3'], linestyle='--', label='Mean', linewidth=3 * scaling_factor)
+#     median_line = mlines.Line2D([], [], color=colors['TUMOrange'], label='Median', linewidth=3 * scaling_factor)
+#     # Add the legend to the top left corner of the central plot
+#     central_ax.legend(handles=[median_line, mean_line], loc='upper left', fontsize=12 * scaling_factor, frameon=True, ncol=2)
+    
+#     # Assign colors to the central boxplots based on weekday or 'Combined'
+#     for i, (box, weekday_or_combined) in enumerate(zip(bp_central['boxes'], all_weekday_numbers)):
+#         box.set_facecolor(weekday_colors[weekday_or_combined])
+#         # Add a slightly thicker border to the average box to make it stand out
+#         if weekday_or_combined == 'Combined':  # Average box
+#             box.set(linewidth=2.0 * scaling_factor)
+    
+#     # Annotate central plot median values
+#     for n, (median_feature, demands) in enumerate(zip(bp_central['medians'], all_boxplot_data)):
+#         demands_series = pd.Series(demands)
+#         median_value = demands_series.median()
+#         x_median, y_median = median_feature.get_xydata()[1]
+#         central_ax.text(x_median, y_median, f'{median_value:.2f}', 
+#                 horizontalalignment='center', color=colors['TUMBlack'], fontsize=10 * scaling_factor, 
+#                 bbox=dict(boxstyle='round', pad=0.3 * scaling_factor, facecolor=colors['TUMWhite'], 
+#                         edgecolor=colors['TUMOrange'], alpha=0.9))
+    
+#     y_max = central_ax.get_ylim()[1]
+    
+#     # Process each CID for individual plots
+#     for i, cid in enumerate(cids):
+#         if i >= len(axes):
+#             break
+            
+#         # Filter data for current CID
+#         cid_data = df_loads[df_loads['cid'] == cid]
+        
+#         # Get the freight forwarder for this CID
+#         ff = cid_data['freight_forwarder'].iloc[0] if not cid_data.empty else "Unknown"
+        
+#         # Calculate and print daily energy demand per home base
+#         print(f"\nHome Base CID {cid} - Daily Energy Demand:")
+#         weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+#         daily_stats = cid_data.groupby('weekday')['energy_demand_kwh'].agg(['mean', 'std', 'median', 'count']).reset_index()
+#         daily_stats['weekday_name'] = daily_stats['weekday'].apply(lambda x: weekday_names[x])
+#         print(daily_stats[['weekday_name', 'mean', 'std', 'median', 'count']])
+#         print(f"Overall mean: {cid_data['energy_demand_kwh'].mean():.2f} kWh")
+        
+#         # Prepare boxplot data with only available weekdays
+#         boxplot_data = []
+#         weekday_labels = []
+#         weekday_numbers = []  # Store the actual weekday numbers
+        
+#         for weekday in range(7):
+#             weekday_data = cid_data[cid_data['weekday'] == weekday]['energy_demand_kwh'].tolist()
+#             if len(weekday_data) > 0:  # Only add if there's data for this weekday
+#                 boxplot_data.append(weekday_data)
+#                 weekday_labels.append(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday])
+#                 weekday_numbers.append(weekday)
+        
+#         # Add the average data for this CID (all weekdays combined)
+#         avg_data = cid_data['energy_demand_kwh'].tolist()
+#         boxplot_data.append(avg_data)
+#         weekday_labels.append('Combined')
+#         weekday_numbers.append('Combined')
+        
+#         # Create boxplot
+#         bp = axes[i].boxplot(
+#             boxplot_data,
+#             patch_artist=True,
+#             showmeans=True,
+#             meanline=True,
+#             meanprops=dict(color=colors['TUMGreen3'], linestyle='--', linewidth=1.5 * scaling_factor),
+#             medianprops=dict(color=colors['TUMOrange'], linewidth=1.5 * scaling_factor),
+#             showfliers=True,
+#             flierprops=dict(marker='o', color='red', alpha=0.5, markersize=3),
+#             whiskerprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#             capprops=dict(color=colors['TUMBlack'], linewidth=0.8 * scaling_factor),
+#             widths=0.55 * scaling_factor,
+#             positions=range(len(boxplot_data)),
+#             labels=weekday_labels
+#         )
+        
+#         # Set x-axis and y-axis tick labels font size
+#         axes[i].tick_params(axis='x', labelsize=10 * scaling_factor)
+#         axes[i].tick_params(axis='y', labelsize=10 * scaling_factor)
+        
+#         # Annotate median values
+#         for n, (median_feature, demands) in enumerate(zip(bp['medians'], boxplot_data)):
+#             demands_series = pd.Series(demands)
+#             median_value = demands_series.median()
+#             x_median, y_median = median_feature.get_xydata()[1]
+#             axes[i].text(x_median, y_median, f'{median_value:.2f}', 
+#                     horizontalalignment='center', color=colors['TUMBlack'], fontsize=8 * scaling_factor, 
+#                     bbox=dict(boxstyle='round', pad=0.3 * scaling_factor, facecolor=colors['TUMWhite'], 
+#                             edgecolor=colors['TUMOrange'], alpha=0.9))
+        
+#         # Assign colors to the boxplots based on weekday or 'Combined'
+#         for j, (box, weekday_or_combined) in enumerate(zip(bp['boxes'], weekday_numbers)):
+#             box.set_facecolor(weekday_colors[weekday_or_combined])
+#             # Add a slightly thicker border to the average box to make it stand out
+#             if weekday_or_combined == 'Combined':  # Average box
+#                 box.set(linewidth=2.0 * scaling_factor)
+        
+#         # Set title for each subplot with both freight forwarder and CID
+#         axes[i].set_title(f'Freight Forwarder {ff} - Home Base CID {cid}', fontsize=12 * scaling_factor)
+        
+#         # Add grid
+#         axes[i].grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, color='lightgrey', alpha=0.7)
+        
+#         # Set y-axis limit
+#         axes[i].set_ylim(0, y_max)
+        
+#         # Customize spines
+#         for spine in axes[i].spines.values():
+#             spine.set_edgecolor(colors['TUMBlack'])
+#             spine.set_linewidth(0.8 * scaling_factor)
+    
+#     # Remove any empty subplots if there are fewer than 14 CIDs
+#     for i in range(len(cids), len(axes)):
+#         fig.delaxes(axes[i])
+    
+#     # Add common labels
+#     #fig.text(0.5, 0.01, 'Weekday', ha='center', va='center', fontsize=16 * scaling_factor)
+#     #fig.text(0.5, 0.01, 'HALLO', ha='center', va='center', fontsize=16 * scaling_factor)
+#     fig.text(0.01, 0.5, 'Energy Demand / kWh', ha='center', va='center', rotation='vertical', fontsize=16 * scaling_factor)
+
+#     plt.tight_layout(rect=[0.02, 0.03, 1, 0.95])  # Adjust layout to make room for common labels
+#     plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.svg', bbox_inches='tight')
+#     plt.savefig('data/output/figures/energy/home_base_weekday_energy_boxplots.pdf', bbox_inches='tight')
+#     plt.show()
 
 
 # ------------------------------------------------------------------------------
@@ -2352,47 +2563,72 @@ def plot_load_profiles_grid(load_profiles, charging_powers, charging_durations):
 # ------------------------------------------------------------------------------
 
 
-def plot_load_profiles_grid_thesis(load_profiles, charging_powers, charging_durations):
+def plot_load_profiles_grid(load_profiles, charging_powers, charging_durations):
     """
-    Creates a single figure with 14 subfigures (7 rows × 2 columns), one for each CID.
+    Creates a grid of load profiles plots, one for each CID.
     
     Parameters:
     -----------
     load_profiles : dict
-        Dictionary mapping CID to dataframe containing load profile data
+        Dictionary of load profiles DataFrames, with CIDs as keys
     charging_powers : dict
-        Dictionary mapping location types to charging power values
+        Dictionary of charging powers for each location type
     charging_durations : dict
-        Dictionary mapping CID to charging durations
+        Dictionary of average charging durations for each CID
         
     Returns:
     --------
-    dict
-        Dictionary containing statistics for each CID
+    stats : dict
+        Dictionary of statistics for each CID
     """
-    print('Using thesis version of plot_load_profiles_grid')
     tum_colors = {
         'mean': colors['TUMBlue1'],       # Average load
         'max': colors['TUMOrange'],       # Maximum load
         'threshold': colors['TUMGreen3'], # 630 kW threshold
-        'threshold2': colors['TUMGreen2'], # 1260 kW threshold
+        'grid_major': colors['TUMGray2'], # Major grid
+        'grid_minor': colors['TUMGray3'], # Minor grid
     }
 
     # Create figure with subplots (7 rows, 2 columns)
-    fig, axes = plt.subplots(7, 2, figsize=(12, 24), sharex=True, sharey=False)
-    axes = axes.flatten()  # Flatten the 2D array for easier indexing
+    fig, axes = plt.subplots(7, 2, figsize=(12, 24))
+    axes_flat = axes.flatten()  # Flatten the 2D array for easier indexing
     
     # Store statistics for return
     all_stats = {}
     
-    # Track if we need threshold lines for legend
-    has_630_threshold = False
-    has_1260_threshold = False
+    global_max = 0
     
-    # Loop through each load profile
+    # First pass: compute global max and statistics
+    for cid, df in load_profiles.items():
+        charging_power = charging_powers['home base']
+        
+        # Filter out days where load_kW is all 0
+        daily_load_sum = df.groupby(df['date'])['load_kW'].sum()
+        active_days = daily_load_sum[daily_load_sum > 0].index.tolist()
+        
+        # Filter the dataframe to only include active days
+        df_active = df[df['date'].isin(active_days)]
+        
+        # Calculate average and maximum load for each hour
+        hourly_avg = df_active.groupby('time')['load_kW'].mean()
+        hourly_max = df_active.groupby('time')['load_kW'].max()
+        
+        global_max = max(global_max, hourly_max.max())
+        
+        # Calculate and store statistics
+        all_stats[cid] = {
+            'active_days': len(active_days),
+            'avg_max_load': hourly_max.mean(),
+            'peak_time': hourly_avg.idxmax() if not hourly_avg.empty else None,
+            'peak_avg_load': hourly_avg.max() if not hourly_avg.empty else 0,
+        }
+    
+    global_max *= 1.05  # Add some padding
+    
+    # Second pass: plotting
     for i, (cid, df) in enumerate(load_profiles.items()):
         # Get the appropriate axis for this CID
-        ax = axes[i]
+        ax = axes_flat[i]
         
         charging_power = charging_powers['home base']
         
@@ -2415,83 +2651,55 @@ def plot_load_profiles_grid_thesis(load_profiles, charging_powers, charging_dura
         # Plot maximum load
         ax.plot(hours, hourly_max.values, label='Max', marker='.', markersize=4, linewidth=1.5, color=tum_colors['max'], linestyle='--')
         
-        # Only add threshold lines if data reaches or exceeds the threshold
-        max_load_value = max(hourly_max.max() if not hourly_max.empty else 0, hourly_avg.max() if not hourly_avg.empty else 0)
+        # Add horizontal line at 630 kW
+        #ax.axhline(y=630, color=tum_colors['threshold'], linestyle='-', linewidth=1, label='630 kW')
         
-        if max_load_value >= 630:
-            ax.axhline(y=630, color=tum_colors['threshold'], linestyle='-', linewidth=1, label='630 kW')
-            has_630_threshold = True
-            
-        if max_load_value >= 1260:
-            ax.axhline(y=1260, color=tum_colors['threshold2'], linestyle='--', linewidth=1, label='1260 kW')
-            has_1260_threshold = True
+        # Add grid with major and minor lines
+        ax.grid(True, which='major', linestyle='-', linewidth=0.8, color=tum_colors['grid_major'], alpha=0.7)
+        ax.grid(True, which='minor', linestyle=':', linewidth=0.5, color=tum_colors['grid_minor'], alpha=0.5)
         
-        # Add grid
-        ax.grid(True, linestyle='--', alpha=0.3)
-
-        # Add y-axis gridlines every 100 kW
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
-        ax.yaxis.set_minor_locator(ticker.MultipleLocator(50))  # Optional: minor gridlines every 50 kW
-        
-        # Set title for each subplot
+        # Set title for each subplot with both freight forwarder and CID
         ax.set_title(f'Freight Forwarder {df["freight_forwarder"].iloc[0]} - Base {cid} - Avg Charging Duration: {charging_durations[cid]} min', fontsize=10)
         
-        # Set x-ticks for all plots
-        ax.set_xticks(range(0, 24, 6))
-        ax.set_xlim(0, 23)
-        ax.tick_params(axis='x', labelsize=8)
-        ax.tick_params(axis='y', labelsize=8)
+        # Add individual x and y axis labels to each subplot
+        ax.set_xlabel('Hour of Day', fontsize=10)
+        ax.set_ylabel('Load (kW)', fontsize=10)
+        
+        # Set x-ticks for all plots and make them always visible
+        ax.set_xticks(range(0, 24, 4))
+        ax.set_xticklabels(['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'])
+        ax.set_xlim(0, 24)
+        ax.tick_params(axis='x', which='both', labelbottom=True, labelsize=10)
+        ax.tick_params(axis='y', labelsize=10)
 
         # Add minor ticks for hours
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
         
-        # Calculate and store statistics
-        all_stats[cid] = {
-            'active_days': len(active_days),
-            'avg_max_load': hourly_max.mean(),
-            'peak_time': hourly_avg.idxmax() if not hourly_avg.empty else None,
-            'peak_avg_load': hourly_avg.max() if not hourly_avg.empty else 0,
-        }
-    
-    # Create legend handles based on what's actually used
-    legend_handles = []
-    legend_labels = []
-    
-    # Add avg and max to legend
-    legend_handles.extend([
-        plt.Line2D([0], [0], color=tum_colors['mean'], marker='.', markersize=8, linewidth=2, label='Avg'),
-        plt.Line2D([0], [0], color=tum_colors['max'], linestyle='--', marker='.', markersize=8, linewidth=2, label='Max')
-    ])
-    legend_labels.extend(['Avg', 'Max'])
-    
-    # Add threshold lines to legend only if they were used
-    if has_630_threshold:
-        legend_handles.append(plt.Line2D([0], [0], color=tum_colors['threshold'], linestyle='-', linewidth=2))
-        legend_labels.append('630 kW')
+        # Add legend only to the first plot
+        # if i == 0:
+        #     ax.legend(fontsize=8, loc='upper right')
+        # Add legend to each plot in the top right corner
+        ax.legend(fontsize=10, loc='upper right', framealpha=0.8)
         
-    if has_1260_threshold:
-        legend_handles.append(plt.Line2D([0], [0], color=tum_colors['threshold2'], linestyle='--', linewidth=2))
-        legend_labels.append('1260 kW')
+        ax.set_ylim(0, global_max)
     
-    # Add main title and legend
-    plt.suptitle(f'Daily Load Profiles for All Home Bases at {charging_power} kW', fontsize=16, fontweight='bold', y=0.98)
+    # Hide any unused subplots
+    for i in range(len(load_profiles), len(axes_flat)):
+        axes_flat[i].set_visible(False)
     
-    # Add legend below title, arranged horizontally
-    fig.legend(legend_handles, legend_labels, loc='upper center', bbox_to_anchor=(0.5, 0.968), 
-               ncol=len(legend_handles), fontsize=12, frameon=True)
+    # Add a main title for the entire figure
+    plt.suptitle(f'Daily Load Profiles for All Home Bases at {charging_power} kW', fontsize=16, fontweight='bold', y=0.95)
     
-    # Add common axis labels
-    fig.text(0.5, 0.02, 'Hour of Day', ha='center', va='center', fontsize=14, fontweight='bold')
-    fig.text(0.02, 0.5, 'Load (kW)', ha='center', va='center', rotation='vertical', fontsize=14, fontweight='bold')
+    # You can still keep the common y-axis label if you want
+    # fig.text(0.01, 0.5, 'Load (kW)', ha='center', va='center', rotation='vertical', fontsize=12)
     
-    # Adjust spacing between subplots
-    plt.tight_layout(rect=[0.04, 0.03, 0.96, 0.96])
+    # Adjust spacing between subplots to make room for the individual labels
+    plt.tight_layout(rect=[0.01, 0.01, 0.99, 0.93])  # Adjust the rect parameters as needed
     
     # Save the figure
     plt.savefig(f'data/output/figures/load_profiles/all_bases_load_{charging_power}kW-profiles.svg', bbox_inches='tight', dpi=300)
     plt.savefig(f'data/output/figures/load_profiles/all_bases_load_{charging_power}kW-profiles.pdf', bbox_inches='tight', dpi=300)
     plt.show()
-    
     return all_stats
 
 
@@ -2568,3 +2776,424 @@ def plot_load_profile(df, cid, charging_powers, charging_duration):
     }
 
 
+
+
+
+def plot_load_profiles_grid_paper(load_profiles, charging_powers, charging_durations):
+    """
+    Creates a single figure with 14 subplots (7 rows × 2 columns), one for each CID.
+    
+    Parameters:
+    -----------
+    load_profiles : dict
+        Dictionary mapping CID to dataframe containing load profile data
+    charging_powers : dict
+        Dictionary mapping location types to charging power values
+    charging_durations : dict
+        Dictionary mapping CID to average charging durations
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing statistics for each CID
+    """
+    print('Using paper version of plot_load_profiles_grid')
+    tum_colors = {
+        'mean': colors['TUMBlue1'],       # Average load
+        'max': colors['TUMOrange'],       # Maximum load
+        'threshold': colors['TUMGreen3'], # 630 kW threshold
+        'threshold2': colors['TUMGreen2'], # 1260 kW threshold
+    }
+
+    # Hardcoded fleet sizes based on the provided image information for 6 freight forwarders
+    fleet_sizes = {
+        1: 18,
+        2: 5,
+        3: 12,
+        4: 18,
+        5: 13,
+        6: 97
+    }
+
+    # Selected CIDs
+    selected_cids = [412, 842, 1251, 502, 0, 745]
+
+    # Sort selected_cids by freight_forwarder id
+    cid_ff_pairs = [(cid, load_profiles[cid]["freight_forwarder"].iloc[0]) for cid in selected_cids if "freight_forwarder" in load_profiles[cid].columns]
+    cid_ff_pairs.sort(key=lambda x: x[1])
+    sorted_cids = [pair[0] for pair in cid_ff_pairs]
+
+    # Create figure with subplots (3 rows, 2 columns)
+    fig, axes = plt.subplots(2, 3, figsize=(11.69, 8.26), sharex=True, sharey=False)
+    axes_flat = axes.flatten()  # Flatten the 2D array for easier indexing
+    
+    # Store statistics for return
+    all_stats = {}
+    
+    # Track if we need threshold lines for legend
+    has_630_threshold = False
+    has_1260_threshold = False
+    
+    global_max = 0
+    
+    # First pass: compute global max, stats, and threshold flags
+    for cid in sorted_cids:
+        df = load_profiles[cid]
+        charging_power = charging_powers['home base']
+        
+        # Filter out days where load_kW is all 0
+        daily_load_sum = df.groupby(df['date'])['load_kW'].sum()
+        active_days = daily_load_sum[daily_load_sum > 0].index.tolist()
+        
+        # Filter the dataframe to only include active days
+        df_active = df[df['date'].isin(active_days)]
+        
+        # Calculate average and maximum load for each hour
+        hourly_avg = df_active.groupby('time')['load_kW'].mean()
+        hourly_max = df_active.groupby('time')['load_kW'].max()
+        
+        max_load_value = max(hourly_max.max() if not hourly_max.empty else 0, hourly_avg.max() if not hourly_avg.empty else 0)
+        
+        global_max = max(global_max, max_load_value)
+        
+        if max_load_value >= 630:
+            has_630_threshold = True
+            
+        if max_load_value >= 1260:
+            has_1260_threshold = True
+        
+        # Calculate and store statistics
+        all_stats[cid] = {
+            'active_days': len(active_days),
+            'avg_max_load': hourly_max.mean(),
+            'peak_time': hourly_avg.idxmax() if not hourly_avg.empty else None,
+            'peak_avg_load': hourly_avg.max() if not hourly_avg.empty else 0,
+        }
+    
+    global_max *= 1.05  # Add some padding
+    
+    # Second pass: plotting
+    for i, cid in enumerate(sorted_cids):
+        # Get the appropriate axis for this CID
+        ax = axes_flat[i]
+        
+        df = load_profiles[cid]
+        charging_power = charging_powers['home base']
+        
+        # Filter out days where load_kW is all 0
+        daily_load_sum = df.groupby(df['date'])['load_kW'].sum()
+        active_days = daily_load_sum[daily_load_sum > 0].index.tolist()
+        
+        # Filter the dataframe to only include active days
+        df_active = df[df['date'].isin(active_days)]
+        
+        # Calculate average and maximum load for each hour
+        hourly_avg = df_active.groupby('time')['load_kW'].mean()
+        hourly_max = df_active.groupby('time')['load_kW'].max()
+        
+        # Get fleet size from hardcoded dict
+        ff = df["freight_forwarder"].iloc[0] if "freight_forwarder" in df.columns else None
+        fleet_size = fleet_sizes.get(ff, 'Unknown')
+        
+        # Convert time objects to hour numbers for plotting
+        hours = [t.hour + t.minute/60 for t in hourly_avg.index]
+        
+        # Plot average load
+        ax.plot(hours, hourly_avg.values, label='Avg', marker='.', markersize=4, linewidth=1.5, color=tum_colors['mean'])
+        # Plot maximum load
+        ax.plot(hours, hourly_max.values, label='Max', marker='.', markersize=4, linewidth=1.5, color=tum_colors['max'], linestyle='--')
+        
+        # Only add threshold lines if data reaches or exceeds the threshold
+        max_load_value = max(hourly_max.max() if not hourly_max.empty else 0, hourly_avg.max() if not hourly_avg.empty else 0)
+        
+        if max_load_value >= 630:
+            ax.axhline(y=630, color=tum_colors['threshold'], linestyle='-', linewidth=1, label='630 kW')
+            
+        if max_load_value >= 1260:
+            ax.axhline(y=1260, color=tum_colors['threshold2'], linestyle='--', linewidth=1, label='1260 kW')
+        
+        # Add grid
+        ax.grid(True, linestyle='--', alpha=0.3)
+
+        # Add y-axis gridlines every 100 kW
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(50))  # Optional: minor gridlines every 50 kW
+        
+        # Set title for each subplot
+        ax.set_title(f'Freight Forwarder {df["freight_forwarder"].iloc[0]} - Base CID {cid} - Avg Charging Duration: {charging_durations[cid]} min', fontsize=8)
+        
+        # Set x-ticks for all plots
+        ax.set_xticks(range(0, 24, 6))
+        ax.set_xticklabels(['00:00', '06:00', '12:00', '18:00'])
+        ax.set_xlim(0, 24)
+        ax.tick_params(axis='x', labelbottom=True, labelsize=8)
+        ax.tick_params(axis='y', labelsize=8)
+
+        # Add minor ticks for hours
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+        
+        ax.set_ylim(0, global_max)
+        
+        # Add analyzed fleet size in a legend-like box in the top right, positioned further right
+        ax.text(0.98, 0.95, f'Analyzed Fleet Size: {fleet_size}', 
+                transform=ax.transAxes, fontsize=10,
+                verticalalignment='top', horizontalalignment='right',
+                bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', boxstyle='round,pad=0.5'))
+    
+    # Create legend handles based on what's actually used
+    legend_handles = []
+    legend_labels = []
+    
+    # Add avg and max to legend
+    legend_handles.extend([
+        plt.Line2D([0], [0], color=tum_colors['mean'], marker='.', markersize=8, linewidth=2, label='Avg'),
+        plt.Line2D([0], [0], color=tum_colors['max'], linestyle='--', marker='.', markersize=8, linewidth=2, label='Max')
+    ])
+    legend_labels.extend(['Avg', 'Max'])
+    
+    # Add threshold lines to legend only if they were used
+    if has_630_threshold:
+        legend_handles.append(plt.Line2D([0], [0], color=tum_colors['threshold'], linestyle='-', linewidth=2))
+        legend_labels.append('630 kW')
+        
+    if has_1260_threshold:
+        legend_handles.append(plt.Line2D([0], [0], color=tum_colors['threshold2'], linestyle='--', linewidth=2))
+        legend_labels.append('1260 kW')
+    
+    # Add main title and legend
+    #plt.suptitle(f'Daily Load Profiles for Selected Home Bases at {charging_power} kW', fontsize=14, fontweight='bold', y=0.98)
+    plt.suptitle(f' ', fontsize=14, fontweight='bold', y=0.98)
+    
+    # Add legend below title, arranged horizontally
+    fig.legend(legend_handles, legend_labels, loc='upper center', bbox_to_anchor=(0.5, 0.968), 
+               ncol=len(legend_handles), fontsize=10, frameon=True)
+
+    # Add common axis labels
+    fig.text(0.5, 0.02, 'Hour of Day', ha='center', va='center', fontsize=12, fontweight='bold')
+    fig.text(0.02, 0.5, 'Load / kW', ha='center', va='center', rotation='vertical', fontsize=12, fontweight='bold')
+    
+    # Adjust spacing between subplots
+    plt.tight_layout(rect=[0.04, 0.03, 0.96, 0.96])
+    
+    # Save the figure
+    plt.savefig(f'data/output/figures/load_profiles/selected_bases_load_{charging_power}kW-profiles.svg', bbox_inches='tight', dpi=300)
+    plt.savefig(f'data/output/figures/load_profiles/selected_bases_load_{charging_power}kW-profiles.pdf', bbox_inches='tight', dpi=300)
+
+    plt.show()
+    
+    return all_stats
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def plot_load_profiles_grid_abstract(load_profiles, charging_powers, charging_durations):
+    """
+    Creates a single figure with 14 subplots (7 rows × 2 columns), one for each CID.
+    
+    Parameters:
+    -----------
+    load_profiles : dict
+        Dictionary mapping CID to dataframe containing load profile data
+    charging_powers : dict
+        Dictionary mapping location types to charging power values
+    charging_durations : dict
+        Dictionary mapping CID to average charging durations
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing statistics for each CID
+    """
+    print('Using paper version of plot_load_profiles_grid')
+    tum_colors = {
+        'mean': colors['TUMBlue1'],       # Average load
+        'max': colors['TUMOrange'],       # Maximum load
+        'threshold': colors['TUMGreen3'], # 630 kW threshold
+        'threshold2': colors['TUMGreen2'], # 1260 kW threshold
+    }
+
+    # Hardcoded fleet sizes based on the provided image information for 6 freight forwarders
+    fleet_sizes = {
+        1: 18,
+        2: 5,
+        3: 12,
+        4: 18,
+        5: 13,
+        6: 97
+    }
+
+    # Create figure with subplots (7 rows, 2 columns)
+    fig, axes = plt.subplots(7, 2, figsize=(12, 24), sharex=True, sharey=False)
+    axes_flat = axes.flatten()  # Flatten the 2D array for easier indexing
+    
+    # Store statistics for return
+    all_stats = {}
+    
+    # Track if we need threshold lines for legend
+    has_630_threshold = False
+    has_1260_threshold = False
+    
+    global_max = 0
+    
+    # First pass: compute global max, stats, and threshold flags
+    for cid, df in load_profiles.items():
+        charging_power = charging_powers['home base']
+        
+        # Filter out days where load_kW is all 0
+        daily_load_sum = df.groupby(df['date'])['load_kW'].sum()
+        active_days = daily_load_sum[daily_load_sum > 0].index.tolist()
+        
+        # Filter the dataframe to only include active days
+        df_active = df[df['date'].isin(active_days)]
+        
+        # Calculate average and maximum load for each hour
+        hourly_avg = df_active.groupby('time')['load_kW'].mean()
+        hourly_max = df_active.groupby('time')['load_kW'].max()
+        
+        max_load_value = max(hourly_max.max() if not hourly_max.empty else 0, hourly_avg.max() if not hourly_avg.empty else 0)
+        
+        global_max = max(global_max, max_load_value)
+        
+        if max_load_value >= 630:
+            has_630_threshold = True
+            
+        if max_load_value >= 1260:
+            has_1260_threshold = True
+        
+        # Calculate and store statistics
+        all_stats[cid] = {
+            'active_days': len(active_days),
+            'avg_max_load': hourly_max.mean(),
+            'peak_time': hourly_avg.idxmax() if not hourly_avg.empty else None,
+            'peak_avg_load': hourly_avg.max() if not hourly_avg.empty else 0,
+        }
+    
+    global_max *= 1.05  # Add some padding
+    
+    # Second pass: plotting
+    for i, (cid, df) in enumerate(load_profiles.items()):
+        # Get the appropriate axis for this CID
+        ax = axes_flat[i]
+        
+        charging_power = charging_powers['home base']
+        
+        # Filter out days where load_kW is all 0
+        daily_load_sum = df.groupby(df['date'])['load_kW'].sum()
+        active_days = daily_load_sum[daily_load_sum > 0].index.tolist()
+        
+        # Filter the dataframe to only include active days
+        df_active = df[df['date'].isin(active_days)]
+        
+        # Calculate average and maximum load for each hour
+        hourly_avg = df_active.groupby('time')['load_kW'].mean()
+        hourly_max = df_active.groupby('time')['load_kW'].max()
+        
+        # Get fleet size from hardcoded dict
+        ff = df["freight_forwarder"].iloc[0] if "freight_forwarder" in df.columns else None
+        fleet_size = fleet_sizes.get(ff, 'Unknown')
+        
+        # Convert time objects to hour numbers for plotting
+        hours = [t.hour + t.minute/60 for t in hourly_avg.index]
+        
+        # Plot average load
+        ax.plot(hours, hourly_avg.values, label='Avg', marker='.', markersize=4, linewidth=1.5, color=tum_colors['mean'])
+        # Plot maximum load
+        ax.plot(hours, hourly_max.values, label='Max', marker='.', markersize=4, linewidth=1.5, color=tum_colors['max'], linestyle='--')
+        
+        # Only add threshold lines if data reaches or exceeds the threshold
+        max_load_value = max(hourly_max.max() if not hourly_max.empty else 0, hourly_avg.max() if not hourly_avg.empty else 0)
+        
+        if max_load_value >= 630:
+            ax.axhline(y=630, color=tum_colors['threshold'], linestyle='-', linewidth=1, label='630 kW')
+            
+        if max_load_value >= 1260:
+            ax.axhline(y=1260, color=tum_colors['threshold2'], linestyle='--', linewidth=1, label='1260 kW')
+        
+        # Add grid
+        ax.grid(True, linestyle='--', alpha=0.3)
+
+        # Add y-axis gridlines every 100 kW
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(50))  # Optional: minor gridlines every 50 kW
+        
+        # Set title for each subplot
+        ax.set_title(f'Freight Forwarder {df["freight_forwarder"].iloc[0]} - Home Base CID {cid} - Avg Charging Duration: {charging_durations[cid]} min', fontsize=10)
+        
+        # Set x-ticks for all plots
+        ax.set_xticks(range(0, 24, 6))
+        ax.set_xticklabels(['00:00', '06:00', '12:00', '18:00'])
+        ax.set_xlim(0, 24)
+        ax.tick_params(axis='x', labelbottom=True, labelsize=8)
+        ax.tick_params(axis='y', labelsize=8)
+
+        # Add minor ticks for hours
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+        
+        ax.set_ylim(0, global_max)
+        
+        # Add analyzed fleet size in a legend-like box in the top right, positioned further right
+        ax.text(0.98, 0.95, f'Analyzed Fleet Size: {fleet_size}', 
+                transform=ax.transAxes, fontsize=10,
+                verticalalignment='top', horizontalalignment='right',
+                bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', boxstyle='round,pad=0.5'))
+    
+    # Create legend handles based on what's actually used
+    legend_handles = []
+    legend_labels = []
+    
+    # Add avg and max to legend
+    legend_handles.extend([
+        plt.Line2D([0], [0], color=tum_colors['mean'], marker='.', markersize=8, linewidth=2, label='Avg'),
+        plt.Line2D([0], [0], color=tum_colors['max'], linestyle='--', marker='.', markersize=8, linewidth=2, label='Max')
+    ])
+    legend_labels.extend(['Avg', 'Max'])
+    
+    # Add threshold lines to legend only if they were used
+    if has_630_threshold:
+        legend_handles.append(plt.Line2D([0], [0], color=tum_colors['threshold'], linestyle='-', linewidth=2))
+        legend_labels.append('630 kW')
+        
+    if has_1260_threshold:
+        legend_handles.append(plt.Line2D([0], [0], color=tum_colors['threshold2'], linestyle='--', linewidth=2))
+        legend_labels.append('1260 kW')
+    
+    # Add main title and legend
+    plt.suptitle(f'Daily Load Profiles for All Home Bases at {charging_power} kW', fontsize=16, fontweight='bold', y=0.98)
+    
+    # Add legend below title, arranged horizontally
+    fig.legend(legend_handles, legend_labels, loc='upper center', bbox_to_anchor=(0.5, 0.968), 
+               ncol=len(legend_handles), fontsize=12, frameon=True)
+    
+    # Add common axis labels
+    fig.text(0.5, 0.02, 'Hour of Day', ha='center', va='center', fontsize=14, fontweight='bold')
+    fig.text(0.02, 0.5, 'Load / kW', ha='center', va='center', rotation='vertical', fontsize=14, fontweight='bold')
+    
+    # Adjust spacing between subplots
+    plt.tight_layout(rect=[0.04, 0.03, 0.96, 0.96])
+    
+    # Save the figure
+    plt.savefig(f'data/output/figures/load_profiles/all_bases_load_{charging_power}kW-profiles.svg', bbox_inches='tight', dpi=300)
+    plt.savefig(f'data/output/figures/load_profiles/all_bases_load_{charging_power}kW-profiles.pdf', bbox_inches='tight', dpi=300)
+
+    plt.show()
+    
+    return all_stats
