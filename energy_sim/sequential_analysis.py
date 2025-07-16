@@ -120,7 +120,7 @@ def combine_tracks_and_stops(df_stops, df_tracks_with_energy):
         df_activities.loc[last_idx, 'occupation'] = 'home base'
 
     # Save the combined dataframe to a CSV file
-    df_activities.to_csv('data/output/csvs/tracks_and_stops.csv', index=False)
+    df_activities.to_csv('output/csvs/tracks_and_stops.csv', index=False)
     
     # Reset index
     df_activities = df_activities.reset_index(drop=True)
@@ -311,13 +311,13 @@ def truck_soc(df_activities, charging_powers, soc_min=0.15):
     print(f"Total energy recharged at industrial areas, when using public charging (as % of total recharge): {(total_recharged_indust/(total_recharged_publicly + total_recharged_private))*100:.2f} %")
 
     # Save the updated dataframe to a CSV file
-    df.to_csv(f"data/output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
+    df.to_csv(f"output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
     
     return df, public_charging
 
 if __name__ == "__main__":
     # Load only the stops data (which now includes all track information)
     df_stops = pd.read_csv('input/stations/stops.csv', index_col='track_id')
-    df_trip_energy= pd.read_csv('data/output/csvs/tracks_with_energy.csv', index_col='track_id')
+    df_trip_energy= pd.read_csv('output/csvs/tracks_with_energy.csv', index_col='track_id')
     
     df_activities = combine_tracks_and_stops(df_stops, df_trip_energy)

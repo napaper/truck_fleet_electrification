@@ -116,14 +116,14 @@ def faulty_tracks():
                 })
 
     mismatched_tracks_df = pd.DataFrame(mismatched_tracks)
-    mismatched_tracks_df.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/mismatched_tracks.csv'))
+    mismatched_tracks_df.to_csv(os.path.join(os.path.dirname(__file__), '../output/mismatched_tracks.csv'))
 
 
 def run_energy_sim(override_mismatched_tracks=False):
     print('Simulating energy consumption')
     tracks_filtered = pd.read_csv('input/stations/tracks_filtered.csv')
 
-    mismatched_tracks_df = pd.read_csv('data/output/csvs/mismatched_tracks.csv')
+    mismatched_tracks_df = pd.read_csv('output/csvs/mismatched_tracks.csv')
 
     # first need to merge the mismatched track csvs with each other and remove duplicate tours 
     # a tour could be included twice if it has both a datagap and mismatched start/stop times
@@ -148,7 +148,7 @@ def run_energy_sim(override_mismatched_tracks=False):
 
     # not actually tested if this works
     if override_mismatched_tracks:
-        mismatched_tracks_df.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/mismatched_tracks.csv'), mode='w')
+        mismatched_tracks_df.to_csv(os.path.join(os.path.dirname(__file__), '../output/mismatched_tracks.csv'), mode='w')
     
     tracks_to_skip = mismatched_tracks_df[mismatched_tracks_df['simulation_skipped'] == True]
 
@@ -192,16 +192,16 @@ def run_energy_sim(override_mismatched_tracks=False):
         
         # intermediate saves due to long runtime 
         #if track_id_new == 50988:
-        #    tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/tracks_filtered_with_energy1.csv'))
+        #    tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../output/tracks_filtered_with_energy1.csv'))
         #if track_id_new == 102899:
-        #    tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/tracks_filtered_with_energy2.csv'))
+        #    tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../output/tracks_filtered_with_energy2.csv'))
         #if track_id_new == 129210:
-        #    tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/tracks_filtered_with_energy3.csv'))
+        #    tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../output/tracks_filtered_with_energy3.csv'))
 
     # save tracks_filtered with energy consumption
-    #tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/tracks_with_energy_raw.csv'))
+    #tracks_filtered.to_csv(os.path.join(os.path.dirname(__file__), '../output/tracks_with_energy_raw.csv'))
     zero_speed_tracks_df = pd.DataFrame(zero_speed_tracks, columns=['track_id'])
-    zero_speed_tracks_df.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/zero_speed_tracks.csv'))
+    zero_speed_tracks_df.to_csv(os.path.join(os.path.dirname(__file__), '../output/zero_speed_tracks.csv'))
 
     return tracks_filtered
 
@@ -209,7 +209,7 @@ def run_energy_sim(override_mismatched_tracks=False):
 
 def clean_energy_sim_data(trips=None):  
     if trips is None:
-        trips = pd.read_csv('data/output/csvs/tracks_with_energy_raw.csv', index_col='track_id')
+        trips = pd.read_csv('output/csvs/tracks_with_energy_raw.csv', index_col='track_id')
 
     # Round energy_consumption_kwh and avg_power_kwh/km to 6 decimal places
     trips['energy_consumption_kwh'] = trips['energy_consumption_kwh'].round(6)
@@ -232,7 +232,7 @@ def clean_energy_sim_data(trips=None):
     trips['energy_consumption_kwh_cleaned'] = trips['energy_consumption_kwh_cleaned'].round(6)
     trips['avg_energy_consumption_kwh/km_cleaned'] = trips['avg_energy_consumption_kwh/km_cleaned'].round(6)
 
-    trips.to_csv(os.path.join(os.path.dirname(__file__), '../data/output/csvs/tracks_with_energy.csv'))
+    trips.to_csv(os.path.join(os.path.dirname(__file__), '../output/csvs/tracks_with_energy.csv'))
     
     return trips
 

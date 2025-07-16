@@ -238,7 +238,7 @@ def analyze_truck_activity(csv_path='input/stations/tours.csv', save_plot=True):
         print(f"  FF {ff}: {ff_count} trucks")
     
     # Plot the results
-    save_path = 'data/output/figures/active_trucks_over_time.svg' if save_plot else None
+    save_path = 'output/figures/active_trucks_over_time.svg' if save_plot else None
     fig = plot_active_trucks(recording_counts, recording_counts_by_ff, 
                             first_last_dates, save_path)
     

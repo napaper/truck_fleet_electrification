@@ -748,7 +748,7 @@ def aggregate_tours(df_trips, charging_powers={'home base': 100, 'industrial are
             print(f"  Percentage: {negative_soc_percentage[ff]:.2f}% \n")
 
         if save:
-            df_tours.to_csv(f"data/output/truck_socs/tours_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
+            df_tours.to_csv(f"output/truck_socs/tours_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
     
     else:
         df_tours = df_trips.groupby('tour_id').agg({
@@ -819,10 +819,10 @@ def daily_energy_demands(tours_df, threshold, charging_powers):
     # Reorder columns to match the requested order
     daily_energy = daily_energy[['day', 'energy_demand_kwh', 'cid', 'freight_forwarder']]
 
-    directory = f"data/output/charging_loads/{charging_power}_kW"
+    directory = f"output/charging_loads/{charging_power}_kW"
     os.makedirs(directory, exist_ok=True)
     # Save the load profile
-    daily_energy.to_csv(f"data/output/charging_loads/{charging_power}_kW/daily_loads.csv", index=False)
+    daily_energy.to_csv(f"output/charging_loads/{charging_power}_kW/daily_loads.csv", index=False)
     
     return daily_energy
 
@@ -950,7 +950,7 @@ def create_minute_occupation_dataframes(activities_file):
     
     # Save each dataframe to a CSV file
     for ff, df in result_dataframes.items():
-        df.to_csv(f'data/output/csvs/minute_occupation_{ff}.csv')
+        df.to_csv(f'output/csvs/minute_occupation_{ff}.csv')
     
     return result_dataframes
 
@@ -1089,7 +1089,7 @@ def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
     print(f"Total energy recharged potential at industrial areas: {total_recharged_potential:.2f} kWh")
 
     # Save the updated dataframe to a CSV file
-    df.to_csv(f"data/output/track_energies/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}_no_disp.csv", index=False)
+    df.to_csv(f"output/track_energies/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}_no_disp.csv", index=False)
     
     return df
 

@@ -37,9 +37,9 @@ def plot_alt_profile(scenario, track, altitude_profile, altitude_profile_filter,
 
     # Save the figure as PDF
     if mapped_id.size > 0:
-        plt.savefig(f'data/output/figures/working_on/altitude_profile_{mapped_id[0]}.pdf', format='pdf')
+        plt.savefig(f'output/figures/working_on/altitude_profile_{mapped_id[0]}.pdf', format='pdf')
     else:
-        plt.savefig('data/output/figures/working_on/altitude_profile_unknown.pdf', format='pdf')
+        plt.savefig('output/figures/working_on/altitude_profile_unknown.pdf', format='pdf')
 
     #plt.show()
 
@@ -80,8 +80,8 @@ def plot_alt_and_speed_profile(scenario, track, altitude_profile, altitude_profi
 
     # Save the figure as PDF
     if mapped_id.size > 0:
-        plt.savefig(f'data/output/figures/speed-altitude_profiles/altitude_profile_{mapped_id[0]}.pdf', format='pdf')
+        plt.savefig(f'output/figures/speed-altitude_profiles/altitude_profile_{mapped_id[0]}.pdf', format='pdf')
     else:
-        plt.savefig('data/output/figures/speed-altitude_profiles', format='pdf')
+        plt.savefig('output/figures/speed-altitude_profiles', format='pdf')
 
     plt.show()

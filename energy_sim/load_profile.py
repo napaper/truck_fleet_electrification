@@ -8,7 +8,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
     Calculate charging load profiles for each charging station based on tour data.
 
     Input: DataFrame with energy demand and stop times for each tour
-        e.g data/output/track_energies/tours_constant_charging_100-300_no_disp.csv
+        e.g output/track_energies/tours_constant_charging_100-300_no_disp.csv
         
     Parameters:
     -----------
@@ -166,7 +166,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
 
         if save:
             # Create directory if it doesn't exist
-            directory = f"data/output/charging_loads/{charging_powers['home base']}_kW"
+            directory = f"output/charging_loads/{charging_powers['home base']}_kW"
             os.makedirs(directory, exist_ok=True)
             # Save the load profile
             load_profile.to_csv(f"{directory}/{cid}_load_profile.csv", index=False)
@@ -184,7 +184,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
         # Convert the nested dictionary to a DataFrame
         stats_df = pd.DataFrame.from_dict(charging_stats, orient='index')
         # Save the statistics
-        stats_directory = "data/output/charging_loads"
+        stats_directory = "output/charging_loads"
         os.makedirs(stats_directory, exist_ok=True)
         stats_df.to_csv(f"{stats_directory}/charging_station_stats.csv")
     
