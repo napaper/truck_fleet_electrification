@@ -645,7 +645,7 @@ def aggregate_hourly_distance(df_trips, per_day=False):
     return result
 
 
-def aggregate_tours(df_trips, charging_powers, soc_min, save=False, energy=False, **kwargs):
+def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
 
     if energy:
         df_tours = df_trips.groupby('tour_id').agg({
@@ -714,7 +714,7 @@ def aggregate_tours(df_trips, charging_powers, soc_min, save=False, energy=False
             print(f"  Percentage: {negative_soc_percentage[ff]:.2f}% \n")
 
         if save:
-            df_tours.to_csv(f"output/truck_socs/tours_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
+            df_tours.to_csv(f"output/truck_socs/tours_constant_charging.csv", index=False)
     
     else:
         df_tours = df_trips.groupby('tour_id').agg({
