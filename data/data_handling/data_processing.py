@@ -1,45 +1,11 @@
 import pandas as pd
-import numpy as np
-import zipfile
 from datetime import datetime, timedelta
-import datetime as dt
-import math
 import os
+import joblib
+
+cache = joblib.Memory(".cache")  # , verbose=0
 
 LOCATIONS = ['home_base', 'rest_area', 'service_area_fuel', 'industrial_area', 'other_area']
-
-colors = {
-    'TUMBlack': '#000000',
-    'TUMWhite': '#FFFFFF',
-    'TUMBlue1': '#005293',
-    'TUMOrange': '#E37222', # 2
-    'TUMBlue2': '#3070b3',  # 3
-    'TUMGreen3': '#A2AD00', # 4 (light green)
-    'TUMBlue3': '#64A0C8',
-    'TUMGreen2': '#515600', # 6 (dark green)
-    'TUMBlue4': '#98C6EA',  # light blue
-    'TUMGray1': '#333333',  # dark 
-    'TUMBlue5': '#B0D0F0',
-    'TUMGray2': '#7F7F7F',  # 10 medium
-    'TUMBlue6': '#2A4D70',
-    'TUMGray3': '#CCCCCC',  # light
-    'TUMBlueDark': '#0B1340',
-    'TUMIvory': '#DAD7CB',
-    'TUMGreen1': '#292B00',
-    'Purple': '#B3679B',    # 15
-    'LightPurple': '#E2ADF2',
-    'DarkPurple': '#31081F',
-    'LightYellow': '#FFE548', #18
-    'Rust': '#885053'         #19
-}
-
-color_list = list(colors.values())
-colors_fleets = {i: color_list[i - 1] for i in range(1, 5)}
-colors_locations = {loc: color_list[i + 4] for i, loc in enumerate([*LOCATIONS, 'other_area', 'driving'])}
-colors_locations_2 = {loc.replace('_', ' '): color_list[i + 4] for i, loc in enumerate([*LOCATIONS, 'other_area', 'driving'])}
-
-alpha_major = 0.8
-alpha_minor = 0.5
 
 def load_data():
     df_trips_unfiltered = pd.read_csv('input/stations/tracks.csv', index_col='track_id', parse_dates=['start_time', 'stop_time'])
@@ -226,7 +192,7 @@ def fix_faulty_tour_endings(trips, trips_unfiltered):
     print(f"Total fixed tours: {total_fixed_tours}")
     return df
 
-
+@cache.cache
 def process_stops_data(df_trips):
     df_stops = df_trips.copy()
     df_stops['service_area_fuel'] = (~df_trips['home_base']) & df_trips['service_area_fuel']

@@ -6,3 +6,4 @@ input/data.zip
 **/*.png
 **/config.py
 **/__pycache__/
+.cache/

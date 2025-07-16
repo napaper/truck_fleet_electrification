@@ -10,7 +10,7 @@ from shapely import wkb
 
 # save results to .cache folder, so database isn't queried each time
 
-#cache = joblib.Memory(".cache")  # , verbose=0
+# cache = joblib.Memory(".cache")  # , verbose=0
 
 
 def get_connection() -> sqlalchemy.engine.Engine:

@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
+import joblib
 
+cache = joblib.Memory(".cache")  # , verbose=0
+
+@cache.cache
 def combine_tracks_and_stops(df_stops, df_tracks_with_energy):
     """
     Processes stops data which contains both track (driving) and stop (rest) information.
@@ -128,6 +132,7 @@ def combine_tracks_and_stops(df_stops, df_tracks_with_energy):
     return df_activities
 
 
+@cache.cache
 def truck_soc(df_activities, charging_powers, soc_min=0.15):
     """
     Adds battery energy, state of charge (SoC), and energy recharged columns to the activities dataframe.
