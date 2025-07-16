@@ -1,5 +1,5 @@
 from matplotlib.colors import  ListedColormap
-
+import colorsys
 # set textwidth for plots
 # 6.32 = FTM Thesis
 textwidth = 6.32 
