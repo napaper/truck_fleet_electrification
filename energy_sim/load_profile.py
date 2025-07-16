@@ -90,6 +90,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
         
         # Process each charging session
         for idx, row in df_cid.iterrows():
+            print(f"Processing row {idx} of {len(df_cid)}")
             arrival = row['stop_time']
             
             # For tracks that require public charging to be completed, assume that the trucks arrives with its min SoC

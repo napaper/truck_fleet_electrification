@@ -83,6 +83,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
         
         # Process each charging session
         for idx, row in df_cid.iterrows():
+            print(f"Processing row {idx} of {len(df_cid)}")
             arrival = row['stop_time']
             
             # For tracks that require public charging to be completed, assume that the trucks arrives with its min SoC
@@ -115,9 +116,6 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
             
             # Add this package as a new column to intermediate dataframe
             package_id = f"pkg_{df_cid.loc[idx]['tour_id']}"
-            # for minute, power in charging_package.items():
-            #     if minute in intermediate_df.index:
-            #         intermediate_df.loc[minute, package_id] = power
             intermediate_df = intermediate_df.join(charging_package.rename(package_id))
 
 
