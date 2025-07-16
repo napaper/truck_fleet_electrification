@@ -645,7 +645,7 @@ def aggregate_hourly_distance(df_trips, per_day=False):
     return result
 
 
-def aggregate_tours(df_trips, charging_powers={'home base': 100, 'industrial area': 300}, save=False, energy=False, min_soc=0.15):
+def aggregate_tours(df_trips, charging_powers, soc_min, save=False, energy=False, **kwargs):
 
     if energy:
         df_tours = df_trips.groupby('tour_id').agg({
@@ -703,8 +703,8 @@ def aggregate_tours(df_trips, charging_powers={'home base': 100, 'industrial are
 
         df_tours = df_tours.merge(tours_driving, on='tour_id', how='left')
 
-        # Calculate the number of instances where min_soc < sic_min for each freight forwarder
-        negative_soc_counts = df_tours[df_tours['soc_min'] < min_soc].groupby('freight_forwarder').size()
+        # Calculate the number of instances where soc < soc_min for each freight forwarder
+        negative_soc_counts = df_tours[df_tours['soc_min'] < soc_min].groupby('freight_forwarder').size()
         total_counts = df_tours.groupby('freight_forwarder').size()
         negative_soc_percentage = (negative_soc_counts / total_counts) * 100
 
@@ -926,7 +926,7 @@ def create_minute_occupation_dataframes(activities_file):
 # ------------------------------------------------------------------------------
 
 
-def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
+def tracks_energy_con_and_regen(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwargs):
     """
     Adds battery energy, state of charge (SoC), and energy recharged columns to the activities dataframe. 
     Unlike sq.truck_soc() this function does not consider truck disposition and only looks at each tour separately.
@@ -958,9 +958,7 @@ def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
     df['soc'] = None
     
     # Define battery capacity
-    battery_capacity = 572  # kWh
-    max_soc = 0.9  # Maximum state of charge (90%)
-    max_battery_energy = battery_capacity * max_soc
+    max_battery_energy = batt_cap * soc_max
     
     # Process each tour separately
     for tour_id in df['tour_id'].unique():
@@ -996,7 +994,7 @@ def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
                     
                     # Calculate how much energy is actually added (limited by battery capacity)
                     energy_added_pot = min(energy_charged, max_battery_energy - current_battery_energy)
-                    energy_added = min(energy_charged, max_battery_energy - max(current_battery_energy, battery_capacity*soc_min))
+                    energy_added = min(energy_charged, max_battery_energy - max(current_battery_energy, batt_cap*soc_min))
                     
                     # Add charged energy, but don't exceed max battery energy
                     current_battery_energy = min(current_battery_energy + energy_charged, max_battery_energy)
@@ -1010,13 +1008,13 @@ def tracks_energy_con_and_regen(df_activities, charging_powers, soc_min=0.15):
                 df.at[idx, 'battery_energy_kwh'] = current_battery_energy
             
             # Calculate SoC
-            df.at[idx, 'soc'] = current_battery_energy / battery_capacity
+            df.at[idx, 'soc'] = current_battery_energy / batt_cap
     
     for tour_id in df['tour_id'].unique():
         # Get all activities for this tour
         tour = df[df['tour_id'] == tour_id].copy()
         tour['soc_start'] = tour['soc'].shift(1)
-        tour.loc[tour.index[0], 'soc_start'] = max_soc  # Set max_soc for the first activity
+        tour.loc[tour.index[0], 'soc_start'] = soc_max  # Set soc_max for the first activity
         # Update the main dataframe
         df.loc[tour.index, 'soc_start'] = tour['soc_start']      
 

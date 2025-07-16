@@ -133,7 +133,7 @@ def combine_tracks_and_stops(df_stops, df_tracks_with_energy):
 
 
 @cache.cache
-def truck_soc(df_activities, charging_powers, soc_min=0.15):
+def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwargs):
     """
     Adds battery energy, state of charge (SoC), and energy recharged columns to the activities dataframe.
     
@@ -162,12 +162,8 @@ def truck_soc(df_activities, charging_powers, soc_min=0.15):
     df['battery_energy_kwh'] = None
     df['soc'] = None
     
-
-    # Define battery capacity
-    battery_capacity = 572  # kWh
-    max_soc = 0.9  # Maximum state of charge (90%)
-    max_battery_energy = battery_capacity * max_soc
-    min_battery_energy = battery_capacity * soc_min
+    max_battery_energy = batt_cap * soc_max
+    min_battery_energy = batt_cap * soc_min
     
     # Create an empty dataframe to record emergency charging events
     public_charging = pd.DataFrame(
@@ -232,7 +228,7 @@ def truck_soc(df_activities, charging_powers, soc_min=0.15):
                     energy_charged = charging_power * charging_time  # kWh
                     
                     # Calculate how much energy is actually added (limited by battery capacity)
-                    energy_added = min(energy_charged, max_battery_energy - max(current_battery_energy, battery_capacity*soc_min))
+                    energy_added = min(energy_charged, max_battery_energy - max(current_battery_energy, batt_cap*soc_min))
                     
                     energy_charged_w_pub = min(energy_charged, max_battery_energy - current_battery_energy_w_pub)
                     
@@ -255,13 +251,13 @@ def truck_soc(df_activities, charging_powers, soc_min=0.15):
                 df.at[idx, 'battery_energy_kwh'] = current_battery_energy
             
             # Calculate SoC
-            df.at[idx, 'soc'] = current_battery_energy / battery_capacity
+            df.at[idx, 'soc'] = current_battery_energy / batt_cap
     
     for vehicle_id in df['vehicle_id'].unique():
         # Get all activities for this vehicle
         vehicle_data = df[df['vehicle_id'] == vehicle_id].copy()
         vehicle_data['soc_start'] = vehicle_data['soc'].shift(1)
-        vehicle_data.loc[vehicle_data.index[0], 'soc_start'] = max_soc  # Set max_soc for the first activity
+        vehicle_data.loc[vehicle_data.index[0], 'soc_start'] = soc_max  # Set soc_max for the first activity
         # Update the main dataframe
         df.loc[vehicle_data.index, 'soc_start'] = vehicle_data['soc_start']      
 
