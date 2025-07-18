@@ -39,6 +39,27 @@ colors = {
 # Remove white and light gray colors from the palette
 line_colors = {k: v for k, v in colors.items() if v not in ['#FFFFFF', '#CCCCCC']}
 
+palette_ff = {
+    1: colors['TUMBlue1'],
+    2: colors['TUMOrange'],
+    3: colors['Purple'],
+    4: colors['TUMGreen3'],
+    5: colors['TUMBlue4'],
+    6: colors['TUMBlue2'],
+}
+
+# Define colors for weekdays and average
+palette_weekdays = {
+    0: colors['TUMBlue4'],  # Monday
+    1: colors['TUMBlue3'],  # Tuesday
+    2: colors['TUMBlue2'],  # Wednesday 
+    3: colors['TUMBlue1'],  # Thursday
+    4: colors['TUMGray3'],  # Friday
+    5: colors['TUMGray2'],  # Saturday 
+    6: colors['TUMGray1'],  # Sunday
+    'Combined': colors['LightPurple']  # Average/Combined column
+}
+
 # Function to calculate brightness
 def brightness(hex_color):
     rgb = tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))

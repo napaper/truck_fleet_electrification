@@ -645,7 +645,8 @@ def aggregate_hourly_distance(df_trips, per_day=False):
     return result
 
 
-def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
+@cache.cache
+def aggregate_tours(df_trips, energy=False):
 
     if energy:
         df_tours = df_trips.groupby('tour_id').agg({
@@ -655,22 +656,24 @@ def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
             'duration_h': 'sum',
             'start_time': 'min',
             'stop_time': 'max',
+            'freight_forwarder': 'min',
             'energy_consumption_kwh_cleaned': 'sum',
             'energy_recharged_kwh': 'sum',
             #'energy_recharged_kwh_potential': 'sum',
             'battery_energy_kwh': ['min', 'mean'],
             'soc': ['min', 'mean'],
-            'soc_start': [ 'first', 'last'],
+            'soc_no_public_charging': ['min', 'mean'],
             'track_id': 'count',
             'cid': 'last',
-            **{col: 'max' for col in df_trips.columns if col not in [
-                'distance', 'distance_km', 'duration', 'duration_h', 'start_time', 'tour_id',
-                'battery_energy', 'soc', 'track_id', 'energy_consumption_kwh_cleaned', 'energy_recharged_kwh',
-                'soc_start', 'location', 'occupation', 'cid', 'stop_time'
-                ]}
-        }).reset_index()
+            }
+        ).reset_index()
 
         df_tours.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col for col in df_tours.columns]
+
+        # Rename soc_start to soc_arrival
+        df_tours = df_tours.rename(columns={
+            'stop_time_max': 'end_time',
+        })
         
         # Drop suffixes for all columns except battery_energy and soc
         df_tours.columns = [
@@ -680,13 +683,6 @@ def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
             for col in df_tours.columns
         ]
 
-        # Rename soc_start to soc_arrival
-        df_tours = df_tours.rename(columns={
-            'soc_start_last': 'soc_at_arrival',
-            'soc_start_first': 'soc_at_departure',
-            'stop_time': 'end_time',
-        })
-
         # Create tours_driving dataframe that only considers activities driving activities 
         # (i.e. activities with a track_id)
         tours_driving = df_trips[df_trips['track_id'].notna()].groupby('tour_id').agg({
@@ -695,7 +691,6 @@ def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
             'stop_time': 'max',
         }).reset_index()
 
-        # Rename the SOC columns for consistency
         tours_driving = tours_driving.rename(columns={
             'duration': 'driving_duration',
             'duration_h': 'driving_duration_h',
@@ -703,19 +698,6 @@ def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
 
         df_tours = df_tours.merge(tours_driving, on='tour_id', how='left')
 
-        # Calculate the number of instances where soc < soc_min for each freight forwarder
-        negative_soc_counts = df_tours[df_tours['soc_min'] < soc_min].groupby('freight_forwarder').size()
-        total_counts = df_tours.groupby('freight_forwarder').size()
-        negative_soc_percentage = (negative_soc_counts / total_counts) * 100
-
-        for ff in negative_soc_counts.index:
-            print(f"Freight Forwarder {ff}:")
-            print(f"  Instances with soc < soc_min: {negative_soc_counts[ff]}")
-            print(f"  Percentage: {negative_soc_percentage[ff]:.2f}% \n")
-
-        if save:
-            df_tours.to_csv(f"output/truck_socs/tours_constant_charging.csv", index=False)
-    
     else:
         df_tours = df_trips.groupby('tour_id').agg({
             'distance': 'sum',
@@ -726,8 +708,6 @@ def aggregate_tours(df_trips, soc_min, save=False, energy=False, **kwargs):
             'cid': 'last',
             **{col: 'max' for col in df_trips.columns if col not in ['distance', 'distance_km', 'duration', 'duration_h', 'start_time', 'tour_id', 'track_id', 'cid']}
         }).reset_index()
-        if save:
-            df_tours.to_csv('input/stations/tours.csv', index=False)
 
     return df_tours
 

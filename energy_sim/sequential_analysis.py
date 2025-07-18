@@ -223,6 +223,14 @@ def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwar
             df.at[idx, 'energy_recharged_kwh'] = energy_added_w_pub
             df.at[idx, 'soc'] = current_battery_energy_w_pub / batt_cap
     
+    # Add soc_no_public_charging column vectorized
+    driving_mask = df['occupation'] == 'driving'
+    df['soc_no_public_charging'] = np.where(
+        driving_mask,
+        (df['battery_energy_kwh'] - df['energy_recharged_kwh'].fillna(0)) / batt_cap,
+        df['battery_energy_kwh'] / batt_cap
+    )
+    
     for vehicle_id in df['vehicle_id'].unique():
         # Get all activities for this vehicle
         vehicle_data = df[df['vehicle_id'] == vehicle_id].copy()
@@ -265,7 +273,12 @@ def evaluate_charging_distribution(df, batt_cap, soc_min, soc_max, evaluate_per_
     print(f"Total energy recharged publicly (as % of total recharge): {(public_recharged.sum()/total_recharged.sum())*100:0,.2f} %")
     print(f"Total energy recharged at home bases, when using public charging (as % of total recharge): {(home_recharged.sum()/total_recharged.sum())*100:0,.2f} %")
     print(f"Total energy recharged at industrial areas, when using public charging (as % of total recharge): {(industrial_recharged.sum()/total_recharged.sum())*100:0,.2f} %")
-
+    
+    return {
+            'public': public_recharged.sum() / total_recharged.sum(),
+            'destination': industrial_recharged.sum() / total_recharged.sum(),
+            'home': home_recharged.sum() / total_recharged.sum()
+            }
 
 if __name__ == "__main__":
     # Load only the stops data (which now includes all track information)

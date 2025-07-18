@@ -7,7 +7,7 @@ import joblib
 cache = joblib.Memory(".cache", verbose=0)
 
 @cache.cache
-def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_threshold=630, save=False):
+def calculate_charging_load_profiles(df_trips, charging_power, load_threshold):
     """
     Calculate charging load profiles for each charging station based on tour data.
 
@@ -35,7 +35,7 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
     charging_stats : dict
         Dictionary containing statistics for each CID (avg duration, max load, time above threshold)
     """
-    df = df_tours.copy()
+    df = df_trips.loc[df_trips.location == 'home base']
     
     # Convert stop_time to datetime if it's not already
     if not pd.api.types.is_datetime64_any_dtype(df['stop_time']):
@@ -52,19 +52,9 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
     df.reset_index(inplace=True)
     # Extract the date (day) from stop_time
     df['day'] = df['stop_time'].dt.date
-    
-    # Calculate energy demand capped by threshold
-    df['energy_demand'] = (df['energy_consumption_kwh_cleaned'] - df['energy_recharged_kwh']).clip(upper=threshold)
-    df['excess_public_energy'] = (df['energy_consumption_kwh_cleaned'] - df['energy_recharged_kwh'] - threshold).clip(lower=0)
-    
-    # Aggregate total energy demands
-    public_energy = df['excess_public_energy'].sum()
-    home_base_energy = df['energy_demand'].sum()
-    industrial_energy = df['energy_recharged_kwh'].sum()
-    
+        
     # Calculate charging power and duration in minutes
-    charging_power = charging_powers['home base']
-    df['charging_duration_min'] = (df['energy_demand'] / charging_power * 60).astype(int)
+    df['charging_duration_min'] = (df['energy_recharged_kwh'] / charging_power * 60).astype(int)
     
     # Calculate charging end time
     df['end_charging_time'] = df['stop_time'] + pd.to_timedelta(df['charging_duration_min'], unit='m')
@@ -124,29 +114,4 @@ def calculate_charging_load_profiles(df_tours, charging_powers, threshold, load_
             'freight_forwarder': cid_freight_forwarders.get(cid, None)
         }
         
-        print(f"Average charging duration for CID {cid}: {charging_stats[cid]['avg_charging_duration_min']:.2f} minutes")
-        print(f"Max load for CID {cid}: {max_load:.2f} kW")
-        print(f"Average time above {load_threshold} kW per day: {avg_minutes_above_threshold:.1f} minutes")
-        print(f"Freight Forwarder: {cid_freight_forwarders.get(cid, None)}\n")
-    
-    print('Total energy demand statistics:')
-    print(f"Total public energy demand: {public_energy:.2f} kWh")
-    print(f"Total home base energy demand: {home_base_energy:.2f} kWh")
-    print(f"Total industrial energy demand: {industrial_energy:.2f} kWh")
-    print(f"Total energy demand: {public_energy + home_base_energy + industrial_energy:.2f} kWh")
-    print(f"public energy demand as percentage of total demand: {(public_energy/(public_energy + home_base_energy + industrial_energy))*100:.2f} %")
-    print(f"home base energy demand as percentage of total demand: {(home_base_energy/(public_energy + home_base_energy + industrial_energy))*100:.2f} %")
-    print(f"industrial energy demand as percentage of total demand: {(industrial_energy/(public_energy + home_base_energy + industrial_energy))*100:.2f} %")
-    
-    if save:
-        directory = f"output/charging_loads/{charging_power}_kW"
-        os.makedirs(directory, exist_ok=True)
-        for cid, load_profile in cid_load_profiles.items():
-            load_profile.to_csv(f"{directory}/{cid}_load_profile.csv", index=False)
-        
-        stats_df = pd.DataFrame.from_dict(charging_stats, orient='index')
-        stats_directory = "output/charging_loads"
-        os.makedirs(stats_directory, exist_ok=True)
-        stats_df.to_csv(f"{stats_directory}/charging_station_stats.csv")
-    
     return cid_load_profiles, charging_stats
