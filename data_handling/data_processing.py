@@ -1053,7 +1053,7 @@ def tracks_energy_con_and_regen(df_activities, charging_powers, batt_cap, soc_mi
     print(f"Total energy recharged potential at industrial areas: {total_recharged_potential:.2f} kWh")
 
     # Save the updated dataframe to a CSV file
-    df.to_csv(f"output/track_energies/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}_no_disp.csv", index=False)
+    # df.to_csv(f"output/track_energies/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}_no_disp.csv", index=False)
     
     return df
 
