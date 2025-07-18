@@ -253,7 +253,7 @@ def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwar
         df.loc[vehicle_data.index, 'soc_start'] = vehicle_data['soc_start']      
 
     # Save the updated dataframe to a CSV file
-    df.to_csv(f"output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
+    # df.to_csv(f"output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
     
     return df, public_charging
 
@@ -276,18 +276,17 @@ def evaluate_charging_distribution(df, public_charging, batt_cap, soc_min, soc_m
     home_recharged = df[(df['occupation'] == 'home base') & df['energy_recharged_kwh'].notna()]['energy_recharged_kwh'].sum()
     total_recharged = df['energy_recharged_kwh'].sum()
     
-    print('Without considering public charging:')
+    print('-- Without considering public charging --')
     print(f"Energy recharged at industrial areas: {industrial_recharged:0,.2f} kWh")
     print(f"Energy recharged at home bases: {home_recharged:0,.2f} kWh")
     print(f"Total energy recharged at private areas: {total_recharged:0,.2f} kWh")
-    print('\n')
 
     total_recharged_publicly = public_charging['public_energy'].sum()
     total_recharged_indust = public_charging['industrial area energy'].sum()
     total_recharged_home = public_charging['home base energy'].sum()
     total_recharged_private = total_recharged_indust + total_recharged_home
 
-    print('Considering public charging:')
+    print('-- Considering public charging --')
     print(f"Total energy recharged publicly: {total_recharged_publicly:0,.2f} kWh")
     print(f"Total energy recharged privately, when using public charging: {total_recharged_private:0,.2f} kWh")
     print(f"Total energy recharged at home bases, when using public charging: {total_recharged_home:0,.2f} kWh")
