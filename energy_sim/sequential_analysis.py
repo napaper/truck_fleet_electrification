@@ -198,58 +198,49 @@ def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwar
         
         # Process each activity in sequence
         for idx in vehicle_data.index:
-            activity = vehicle_data.loc[idx]
-            
+            activity = vehicle_data.loc[idx]            
             if activity['occupation'] == 'driving':
                 # Subtract energy consumption for driving
                 if 'energy_consumption_kwh_cleaned' in df.columns and pd.notna(activity['energy_consumption_kwh_cleaned']):
                     current_battery_energy -= activity['energy_consumption_kwh_cleaned']
                     current_battery_energy_w_pub -= activity['energy_consumption_kwh_cleaned']
-                    current_battery_energy = min(current_battery_energy, max_battery_energy)
-                    current_battery_energy_w_pub = min(current_battery_energy_w_pub, max_battery_energy)
+
                     if current_battery_energy_w_pub < min_battery_energy:
                         req_charge = min_battery_energy - current_battery_energy_w_pub
                         current_battery_energy_w_pub = min_battery_energy
                         public_charging.loc[vehicle_id, 'public_energy'] += req_charge
 
-
-                # Set the starting battery energy for this drive
+                # Set the terminal battery energy for this drive
                 df.at[idx, 'battery_energy_kwh'] = current_battery_energy
                 
-                # No energy recharged during driving (keep as None)
-                # df.at[idx, 'energy_recharged_kwh'] remains None
-
             else:
+                energy_added = 0
                 # For rest periods, check if charging is available at this occupation
                 occupation = activity['occupation']
-                if occupation in charging_powers and pd.notna(activity['duration_h']):
+                if (occupation in charging_powers):
+                    
                     charging_power = charging_powers[occupation]  # kW
                     charging_time = activity['duration_h']  # hours
                     energy_charged = charging_power * charging_time  # kWh
                     
                     # Calculate how much energy is actually added (limited by battery capacity)
-                    energy_added = min(energy_charged, max_battery_energy - max(current_battery_energy, batt_cap*soc_min))
+                    energy_added = min(energy_charged, max_battery_energy - current_battery_energy)
                     
-                    energy_charged_w_pub = min(energy_charged, max_battery_energy - current_battery_energy_w_pub)
+                    energy_added_w_pub = min(energy_charged, max_battery_energy - current_battery_energy_w_pub)
                     
-                    if current_battery_energy_w_pub < min_battery_energy or energy_charged_w_pub > max_battery_energy:
-                        raise ValueError(f"Invalid energy values: current_battery_energy_w_pub is below minimum or energy_charged_w_pub exceeds maximum")
+                    assert current_battery_energy_w_pub >= min_battery_energy-.1, f"Invalid energy values: current_battery_energy_w_pub {current_battery_energy_w_pub:.2f} is below minimum {min_battery_energy:.2f}"
+                    assert energy_added_w_pub <= max_battery_energy+.1, f"Invalid energy values: energy_charged_w_pub {current_battery_energy_w_pub:.2f} exceeds maximum {max_battery_energy:.2f}"
                     
                     # Add charged energy, but don't exceed max battery energy
-                    current_battery_energy = min(current_battery_energy + energy_charged, max_battery_energy)
+                    current_battery_energy += energy_added
+                    current_battery_energy_w_pub += energy_added_w_pub
+                    public_charging.loc[vehicle_id, f'{occupation} energy'] += energy_added_w_pub
 
-                    current_battery_energy_w_pub = current_battery_energy_w_pub + energy_charged_w_pub
-                    public_charging.loc[vehicle_id, f'{occupation} energy'] += energy_charged_w_pub
+                    assert current_battery_energy_w_pub >= current_battery_energy-.1, f"Invalid energy values: current_battery_energy_w_pub {current_battery_energy_w_pub:.2f} should not be less then without public charging {current_battery_energy:.2f}"
 
-                    if current_battery_energy_w_pub < current_battery_energy:
-                        raise ValueError(f"Invalid energy values: current battery energy with public charging should not be less then without public charging")
-
-                    # Record recharged energy (consolidated into a single column)
-                    if energy_added > 0:
-                        df.at[idx, 'energy_recharged_kwh'] = energy_added
-
+                # Record recharged energy (consolidated into a single column)
                 df.at[idx, 'battery_energy_kwh'] = current_battery_energy
-            
+                df.at[idx, 'energy_recharged_kwh'] = energy_added
             # Calculate SoC
             df.at[idx, 'soc'] = current_battery_energy / batt_cap
     
@@ -261,30 +252,24 @@ def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwar
         # Update the main dataframe
         df.loc[vehicle_data.index, 'soc_start'] = vehicle_data['soc_start']      
 
-
-    # Round to reasonable precision
-    df['battery_energy_kwh'] = pd.to_numeric(df['battery_energy_kwh'])
-    df['energy_recharged_kwh'] = pd.to_numeric(df['energy_recharged_kwh'])
-    df['soc'] = pd.to_numeric(df['soc'])
-    df['battery_energy_kwh'] = df['battery_energy_kwh'].round(2)
+    # Save the updated dataframe to a CSV file
+    df.to_csv(f"output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
     
-    # Only round where df it's not None
-    mask = df['energy_recharged_kwh'].notna()
-    if mask.any():
-        df.loc[mask, 'energy_recharged_kwh'] = df.loc[mask, 'energy_recharged_kwh'].round(2)
+    return df, public_charging
 
-    df['soc'] = df['soc'].round(4)
-    df['soc_start'] = df['soc_start'].astype(float).round(4)
 
+def evaluate_charging_distribution(df, public_charging, batt_cap, soc_min, soc_max, evaluate_per_fleet=True, **kwargs):
+    
     # Calculate the number of instances where soc < soc_min for each freight forwarder
     negative_soc_counts = df[df['soc'] < soc_min].groupby('freight_forwarder').size()
     total_counts = df.groupby('freight_forwarder').size()
     negative_soc_percentage = (negative_soc_counts / total_counts) * 100
 
-    for ff in negative_soc_counts.index:
-        print(f"Freight Forwarder {ff}:")
-        print(f"  Instances with soc < soc_min: {negative_soc_counts[ff]}")
-        print(f"  Percentage: {negative_soc_percentage[ff]:.2f}% \n")
+    if evaluate_per_fleet:
+        for ff in negative_soc_counts.index:
+            print(f"Freight Forwarder {ff}:")
+            print(f"  Instances with soc < soc_min: {negative_soc_counts[ff]}")
+            print(f"  Percentage: {negative_soc_percentage[ff]:.2f}% \n")
     
     # Calculate total energy recharged at different locations for reporting
     industrial_recharged = df[(df['occupation'] == 'industrial area') & df['energy_recharged_kwh'].notna()]['energy_recharged_kwh'].sum()
@@ -292,9 +277,9 @@ def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwar
     total_recharged = df['energy_recharged_kwh'].sum()
     
     print('Without considering public charging:')
-    print(f"Energy recharged at industrial areas: {industrial_recharged:.2f} kWh")
-    print(f"Energy recharged at home bases: {home_recharged:.2f} kWh")
-    print(f"Total energy recharged at private areas: {total_recharged:.2f} kWh")
+    print(f"Energy recharged at industrial areas: {industrial_recharged:0,.2f} kWh")
+    print(f"Energy recharged at home bases: {home_recharged:0,.2f} kWh")
+    print(f"Total energy recharged at private areas: {total_recharged:0,.2f} kWh")
     print('\n')
 
     total_recharged_publicly = public_charging['public_energy'].sum()
@@ -303,18 +288,14 @@ def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwar
     total_recharged_private = total_recharged_indust + total_recharged_home
 
     print('Considering public charging:')
-    print(f"Total energy recharged publicly: {total_recharged_publicly:.2f} kWh")
-    print(f"Total energy recharged privately, when using public charging: {total_recharged_private:.2f} kWh")
-    print(f"Total energy recharged at home bases, when using public charging: {total_recharged_home:.2f} kWh")
-    print(f"Total energy recharged at industrial areas, when using public charging: {total_recharged_indust:.2f} kWh")
-    print(f"Total energy recharged publicly (as % of total recharge): {(total_recharged_publicly/(total_recharged_publicly + total_recharged_private))*100:.2f} %")
-    print(f"Total energy recharged at home bases, when using public charging (as % of total recharge): {(total_recharged_home/(total_recharged_publicly + total_recharged_private))*100:.2f} %")
-    print(f"Total energy recharged at industrial areas, when using public charging (as % of total recharge): {(total_recharged_indust/(total_recharged_publicly + total_recharged_private))*100:.2f} %")
+    print(f"Total energy recharged publicly: {total_recharged_publicly:0,.2f} kWh")
+    print(f"Total energy recharged privately, when using public charging: {total_recharged_private:0,.2f} kWh")
+    print(f"Total energy recharged at home bases, when using public charging: {total_recharged_home:0,.2f} kWh")
+    print(f"Total energy recharged at industrial areas, when using public charging: {total_recharged_indust:0,.2f} kWh")
+    print(f"Total energy recharged publicly (as % of total recharge): {(total_recharged_publicly/(total_recharged_publicly + total_recharged_private))*100:0,.2f} %")
+    print(f"Total energy recharged at home bases, when using public charging (as % of total recharge): {(total_recharged_home/(total_recharged_publicly + total_recharged_private))*100:0,.2f} %")
+    print(f"Total energy recharged at industrial areas, when using public charging (as % of total recharge): {(total_recharged_indust/(total_recharged_publicly + total_recharged_private))*100:0,.2f} %")
 
-    # Save the updated dataframe to a CSV file
-    df.to_csv(f"output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
-    
-    return df, public_charging
 
 if __name__ == "__main__":
     # Load only the stops data (which now includes all track information)
