@@ -7,7 +7,7 @@ import joblib
 cache = joblib.Memory(".cache", verbose=0)
 
 @cache.cache
-def calculate_charging_load_profiles(df_trips, charging_power, load_threshold):
+def calculate_charging_load_profiles(df_, charging_power, load_threshold):
     """
     Calculate charging load profiles for each charging station based on tour data.
 
@@ -35,29 +35,16 @@ def calculate_charging_load_profiles(df_trips, charging_power, load_threshold):
     charging_stats : dict
         Dictionary containing statistics for each CID (avg duration, max load, time above threshold)
     """
-    df = df_trips.loc[df_trips.location == 'home base']
-    
-    # Convert stop_time to datetime if it's not already
-    if not pd.api.types.is_datetime64_any_dtype(df['stop_time']):
-        df['stop_time'] = pd.to_datetime(df['stop_time'], utc=True)
+    df = df_.loc[df_.location == 'home base']
     
     # Round stop and start times to the nearest minute
-    df['stop_time'] = df['stop_time'].apply(
-        lambda x: x - timedelta(seconds=x.second, microseconds=x.microsecond) 
-    )
-
-    # Set stop time as index and convert it to local time    
-    df.set_index('stop_time', inplace=True)
-    df.index = df.index.tz_convert('Europe/Berlin')
-    df.reset_index(inplace=True)
-    # Extract the date (day) from stop_time
-    df['day'] = df['stop_time'].dt.date
-        
+    df = df.assign(stop_time_=df['stop_time'].dt.floor('min'))
+  
     # Calculate charging power and duration in minutes
-    df['charging_duration_min'] = (df['energy_recharged_kwh'] / charging_power * 60).astype(int)
-    
+    df = df.assign(charging_duration_min=(df['energy_recharged_kwh'] / charging_power * 60).astype(int))
+     
     # Calculate charging end time
-    df['end_charging_time'] = df['stop_time'] + pd.to_timedelta(df['charging_duration_min'], unit='m')
+    df = df.assign(end_charging_time=df['stop_time_'] + pd.to_timedelta(df['charging_duration_min'], unit='m'))
     
     # Get unique cids and freight forwarders
     cid_freight_forwarders = df.groupby('cid')['freight_forwarder'].first().to_dict()
@@ -72,7 +59,7 @@ def calculate_charging_load_profiles(df_trips, charging_power, load_threshold):
     df_expanded['minute_offset'] = df_expanded.groupby(level=0).cumcount()
     
     # Calculate the timestamp for each minute of charging
-    df_expanded['charging_time'] = df_expanded['stop_time'] + pd.to_timedelta(df_expanded['minute_offset'], unit='m')
+    df_expanded['charging_time'] = df_expanded['stop_time_'] + pd.to_timedelta(df_expanded['minute_offset'], unit='m')
     
     # Create a multi-index by cid and charging_time
     df_expanded.set_index(['cid', 'charging_time'], inplace=True)
