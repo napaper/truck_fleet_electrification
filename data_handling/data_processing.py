@@ -768,7 +768,7 @@ def daily_energy_demands(tours_df, threshold, charging_powers):
     directory = f"output/charging_loads/{charging_power}_kW"
     os.makedirs(directory, exist_ok=True)
     # Save the load profile
-    daily_energy.to_csv(f"output/charging_loads/{charging_power}_kW/daily_loads.csv", index=False)
+    # daily_energy.to_csv(f"output/charging_loads/{charging_power}_kW/daily_loads.csv", index=False)
     
     return daily_energy
 
