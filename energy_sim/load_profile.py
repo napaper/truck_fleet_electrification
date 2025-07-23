@@ -6,8 +6,9 @@ import joblib
 
 cache = joblib.Memory(".cache", verbose=0)
 
+
 @cache.cache
-def calculate_charging_load_profiles(df_, charging_power, load_threshold):
+def calculate_charging_load_profiles(df_, charging_power, load_threshold, charging_strategy='immediate'):
     """
     Calculate charging load profiles for each charging station based on tour data.
 
@@ -20,12 +21,10 @@ def calculate_charging_load_profiles(df_, charging_power, load_threshold):
         DataFrame containing tour data with energy demand and stop times
     charging_powers : dict
         Dictionary mapping location types to charging power values
-    threshold : float
-        Energy threshold in kWh for charging demand calculation
     load_threshold : float, optional
         Threshold in kW to calculate time above threshold, default is 630 kW
-    save : bool, optional
-        Whether to save the output files, default is False
+    charging_strategy : str, optional
+        Charging strategy to use: 'immediate' (default), 'delayed', or 'average'
         
     Returns:
     --------
@@ -35,70 +34,52 @@ def calculate_charging_load_profiles(df_, charging_power, load_threshold):
     charging_stats : dict
         Dictionary containing statistics for each CID (avg duration, max load, time above threshold)
     """
-    df = df_.loc[df_.location == 'home base']
+    df = df_.loc[(df_.location == 'home base') & (df_.distance.isna())]
     
     # Round stop and start times to the nearest minute
     df = df.assign(stop_time_=df['stop_time'].dt.floor('min'))
   
-    # Calculate charging power and duration in minutes
-    df = df.assign(charging_duration_min=(df['energy_recharged_kwh'] / charging_power * 60).astype(int))
-     
-    # Calculate charging end time
-    df = df.assign(end_charging_time=df['stop_time_'] + pd.to_timedelta(df['charging_duration_min'], unit='m'))
+    if charging_strategy == 'delayed':
+        # Adjust start charging time to be as late as possible before stop_time
+        df = df.assign(charging_duration_min=(df['energy_recharged_kwh'] / charging_power * 60).astype(int))
+        df = df.assign(
+            start_charging_time=df['stop_time_'] + pd.to_timedelta((df['duration'] / 60 - df['charging_duration_min']).fillna(0).astype(int), unit='m')
+        )
+        df = df.assign(charging_power=charging_power)
+    elif charging_strategy == 'average':
+        # Charge evenly over the whole time frame from start_charging_time to stop_time_
+        # Here, we assume start_charging_time is the earliest time charging can start, e.g. arrival time
+        # For simplicity, assume charging window is from (stop_time_ - charging_duration_min) to stop_time_
+        # So average power is charging_power spread evenly over charging_duration_min
+        df = df.assign(charging_duration_min=(df['duration'] / 60).astype(int))
+        df = df.assign(start_charging_time=df['stop_time_'])
+        df = df.assign(charging_power=df['energy_recharged_kwh'] / df['charging_duration_min'] * 60)
+    elif charging_strategy == 'immediate':
+        # Immediate charging: start charging at stop_time_
+        df = df.assign(charging_duration_min=(df['energy_recharged_kwh'] / charging_power * 60).astype(int))
+        df = df.assign(start_charging_time=df['stop_time_'])
+        df = df.assign(charging_power=charging_power)
+    else:
+        raise ValueError("Invalid charging strategy. Choose from 'immediate', 'delayed', or 'average'.")
     
-    # Get unique cids and freight forwarders
-    cid_freight_forwarders = df.groupby('cid')['freight_forwarder'].first().to_dict()
+    df = df.assign(end_charging_time=df['start_charging_time'] + pd.to_timedelta(df['charging_duration_min'], unit='m'))
     
-    # Create a DataFrame to hold all charging events expanded by minute
-    # For vectorization, create a DataFrame with repeated rows for each minute of charging
-    
-    # Repeat rows by charging duration
+    # Expand df to one row per minute of charging using the charging_duration_min column
     df_expanded = df.loc[df.index.repeat(df['charging_duration_min'])].copy()
-    
-    # Create a minute offset for each repeated row
     df_expanded['minute_offset'] = df_expanded.groupby(level=0).cumcount()
+
+    df_expanded['time_'] = df_expanded['start_charging_time'] + pd.to_timedelta(df_expanded['minute_offset'], unit='m')
     
-    # Calculate the timestamp for each minute of charging
-    df_expanded['charging_time'] = df_expanded['stop_time_'] + pd.to_timedelta(df_expanded['minute_offset'], unit='m')
-    
-    # Create a multi-index by cid and charging_time
-    df_expanded.set_index(['cid', 'charging_time'], inplace=True)
-    
-    # Assign charging power as load
-    df_expanded['load_kW'] = charging_power
-    
-    # Aggregate load by cid and charging_time
-    load_agg = df_expanded.groupby(level=['cid', 'charging_time'])['load_kW'].sum().unstack(level=0).fillna(0)
+    load_agg = df_expanded.groupby(['cid', 'time_']).charging_power.sum().unstack(level=0).fillna(0)
     
     # Prepare output dictionaries
     cid_load_profiles = {}
     charging_stats = {}
-    
+   
     # For each cid, create load profile DataFrame and calculate statistics
-    for cid in load_agg.columns:
-        load_series = load_agg[cid]
-        load_profile = pd.DataFrame({
-            'date': load_series.index.date,
-            'time': load_series.index.time,
-            'freight_forwarder': cid_freight_forwarders.get(cid, None),
-            'load_kW': load_series.values
-        }, index=load_series.index)
+    charging_stats = {
+        'max_load_kW': load_agg.max().to_dict(),
+        'minutes_above_threshold': (load_agg > load_threshold).sum().to_dict(),
+    }
         
-        max_load = load_profile['load_kW'].max()
-        avg_charging_duration = df.loc[df['cid'] == cid, 'charging_duration_min'].mean()
-        
-        load_profile['above_threshold'] = load_profile['load_kW'] > load_threshold
-        above_threshold_per_day = load_profile.groupby('date')['above_threshold'].sum()
-        avg_minutes_above_threshold = above_threshold_per_day.mean() if not above_threshold_per_day.empty else 0
-        avg_minutes_above_threshold = round(avg_minutes_above_threshold, 1)
-        
-        cid_load_profiles[cid] = load_profile
-        
-        charging_stats[cid] = {
-            'avg_charging_duration_min': round(avg_charging_duration, 1) if not pd.isna(avg_charging_duration) else 0,
-            'max_load_kW': max_load,
-            'avg_minutes_above_threshold': avg_minutes_above_threshold,
-            'freight_forwarder': cid_freight_forwarders.get(cid, None)
-        }
-        
-    return cid_load_profiles, charging_stats
+    return load_agg, charging_stats

@@ -60,6 +60,17 @@ palette_weekdays = {
     'Combined': colors['LightPurple']  # Average/Combined column
 }
 
+scenario_names = {'default': 'Default', 
+    'low_home': '50kW Home', 
+    'high_home': '350kW Home', 
+    'destination': 'Destination Charging', 
+    'big_batt': 'Large Battery',
+    'ultra_home': 'Inf. Home Charging',
+    'backup1': 'Backup 1',
+    'backup2': 'Backup 2',
+    }
+
+
 # Function to calculate brightness
 def brightness(hex_color):
     rgb = tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))
