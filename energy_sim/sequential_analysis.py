@@ -134,118 +134,108 @@ def combine_tracks_and_stops(df_stops, df_tracks_with_energy):
 
 @cache.cache
 def truck_soc(df_activities, charging_powers, batt_cap, soc_min, soc_max, **kwargs):
-    """
-    Adds battery energy, state of charge (SoC), and energy recharged columns to the activities dataframe.
-    
-    Parameters:
-    -----------
-    df_activities : pandas.DataFrame
-        DataFrame containing activities (driving and rest periods)
-    charging_powers : dict
-        Dictionary with occupation types as keys and charging powers (kW) as values
-    soc_min : float, optional
-        Minimum acceptable state of charge for reporting statistics
-    
-    Returns:
-    --------
-    pandas.DataFrame
-        DataFrame with added battery_energy_kwh, energy_recharged_kwh and soc columns
-    """
-    # Create a copy to avoid modifying the original
+    import numpy as np
+    import pandas as pd
+
     df = df_activities.copy()
-    
-    # Sort by vehicle_id and start_time to ensure proper sequence
     df = df.sort_values(['vehicle_id', 'start_time'])
-    
-    # Add battery_energy, soc, and energy_recharged columns
+
     df['energy_recharged_kwh'] = None     
     df['battery_energy_kwh'] = None
     df['soc'] = None
-    
+
     max_battery_energy = batt_cap * soc_max
     min_battery_energy = batt_cap * soc_min
-    
-    # Process each vehicle separately
+
     for vehicle_id in df['vehicle_id'].unique():
-        # Get all activities for this vehicle
         vehicle_data = df[df['vehicle_id'] == vehicle_id].copy()
-        
-        # Initialize battery energy for first activity
-        current_battery_energy_w_pub = max_battery_energy
+        current_battery_energy = max_battery_energy
 
-        # Get freight_forwarder value for this vehicle
-        freight_forwarder = vehicle_data['freight_forwarder'].iloc[0] if 'freight_forwarder' in vehicle_data.columns and not vehicle_data['freight_forwarder'].isna().all() else None
-        
-        # Add a row to emergency_charging_events
-        # Create a new DataFrame with vehicle_id as index
-        new_entry = pd.DataFrame({
-            'freight_forwarder': [freight_forwarder],
-            'public_energy': [0],
-            'home base energy': [0], 
-            'industrial area energy': [0], 
-        }, index=[vehicle_id])
-        # Set the index name
-        new_entry.index.name = 'vehicle_id'
-        
-        # Process each activity in sequence
         for idx in vehicle_data.index:
-            activity = vehicle_data.loc[idx]            
-            energy_added_w_pub = 0
+            activity = vehicle_data.loc[idx]
+            energy_added = 0
+
             if activity['occupation'] == 'driving':
-                # Subtract energy consumption for driving
                 if 'energy_consumption_kwh_cleaned' in df.columns and pd.notna(activity['energy_consumption_kwh_cleaned']):
-                    current_battery_energy_w_pub -= activity['energy_consumption_kwh_cleaned']
+                    current_battery_energy -= activity['energy_consumption_kwh_cleaned']
+                    # Emergency top-up to prevent below min SoC
+                    if current_battery_energy < min_battery_energy:
+                        energy_needed = min_battery_energy - current_battery_energy
+                        current_battery_energy = min_battery_energy
+                        energy_added = energy_needed  # For tracking
 
-                    if current_battery_energy_w_pub < min_battery_energy:
-                        energy_added_w_pub = min_battery_energy - current_battery_energy_w_pub
-                        current_battery_energy_w_pub = min_battery_energy
-                
             else:
-                # For rest periods, check if charging is available at this occupation
                 occupation = activity['occupation']
-                if (occupation in charging_powers):
-                    
-                    charging_power = charging_powers[occupation]  # kW
-                    charging_time = activity['duration_h']  # hours
-                    energy_charged = charging_power * charging_time  # kWh
-                    
-                    # Calculate how much energy is actually added (limited by battery capacity)
-                    energy_added_w_pub = min(energy_charged, max_battery_energy - current_battery_energy_w_pub)
-                    # Add charged energy
-                    current_battery_energy_w_pub += energy_added_w_pub
-                    
-                    assert current_battery_energy_w_pub >= min_battery_energy-.1, f"Invalid energy values: current_battery_energy_w_pub {current_battery_energy_w_pub:.2f} is below minimum {min_battery_energy:.2f}"
-                    assert energy_added_w_pub <= max_battery_energy+.1, f"Invalid energy values: energy_charged_w_pub {current_battery_energy_w_pub:.2f} exceeds maximum {max_battery_energy:.2f}"
-                    
+                if occupation in charging_powers:
+                    charging_power = charging_powers[occupation]
+                    charging_time = activity['duration_h']
+                    energy_possible_now = charging_power * charging_time
+                    energy_to_full = max_battery_energy - current_battery_energy
 
-            # Record recharged energy (consolidated into a single column)
-            df.at[idx, 'battery_energy_kwh'] = current_battery_energy_w_pub
-            df.at[idx, 'energy_recharged_kwh'] = energy_added_w_pub
-            df.at[idx, 'soc'] = current_battery_energy_w_pub / batt_cap
-    
-    # Add soc_no_public_charging column vectorized
+                    # If this is NOT a home base and NOT driving
+                    if occupation != 'home base' and occupation != 'driving':
+                        # Check whether we can safely skip charging and reach the next home base with enough SoC
+                        future_activities = vehicle_data.loc[idx+1:]
+                        cumulative_consumption = 0
+                        home_found = False
+
+                        for future_idx, future_activity in future_activities.iterrows():
+                            if future_activity['occupation'] == 'driving' and pd.notna(future_activity.get('energy_consumption_kwh_cleaned', None)):
+                                cumulative_consumption += future_activity['energy_consumption_kwh_cleaned']
+                            elif future_activity['occupation'] == 'home base':
+                                home_found = True
+                                break
+
+                        if home_found:
+                            projected_energy = current_battery_energy - cumulative_consumption
+                            if projected_energy >= min_battery_energy:
+                                energy_added = 0  # Safe to defer charging
+                            else:
+                                # Not safe – must charge now to avoid SoC dip
+                                required_now = min_battery_energy + cumulative_consumption - current_battery_energy
+                                energy_added = min(energy_possible_now, required_now, energy_to_full)
+                                current_battery_energy += energy_added
+                        else:
+                            # No home charging ahead – charge as much as possible now
+                            energy_added = min(energy_possible_now, energy_to_full)
+                            current_battery_energy += energy_added
+                    else:
+                        # Home base or driving: charge as usual
+                        energy_added = min(energy_possible_now, energy_to_full)
+                        current_battery_energy += energy_added
+
+                    # Enforce bounds
+                    assert current_battery_energy >= min_battery_energy - 1e-3, (
+                        f"Energy dropped below min: {current_battery_energy:.2f} < {min_battery_energy:.2f}"
+                    )
+                    assert current_battery_energy <= max_battery_energy + 1e-3, (
+                        f"Energy exceeded max: {current_battery_energy:.2f} > {max_battery_energy:.2f}"
+                    )
+
+            df.at[idx, 'battery_energy_kwh'] = current_battery_energy
+            df.at[idx, 'energy_recharged_kwh'] = energy_added
+            df.at[idx, 'soc'] = current_battery_energy / batt_cap
+
+    # Calculate soc_no_public_charging
     driving_mask = df['occupation'] == 'driving'
     df['soc_no_public_charging'] = np.where(
         driving_mask,
         (df['battery_energy_kwh'] - df['energy_recharged_kwh'].fillna(0)) / batt_cap,
         df['battery_energy_kwh'] / batt_cap
     )
-    
+
+    # Add soc_start (shifted SoC)
     for vehicle_id in df['vehicle_id'].unique():
-        # Get all activities for this vehicle
         vehicle_data = df[df['vehicle_id'] == vehicle_id].copy()
         vehicle_data['soc_start'] = vehicle_data['soc'].shift(1)
-        vehicle_data.loc[vehicle_data.index[0], 'soc_start'] = soc_max  # Set soc_max for the first activity
-        # Update the main dataframe
-        df.loc[vehicle_data.index, 'soc_start'] = vehicle_data['soc_start']      
+        vehicle_data.loc[vehicle_data.index[0], 'soc_start'] = soc_max
+        df.loc[vehicle_data.index, 'soc_start'] = vehicle_data['soc_start']
 
-    # Save the updated dataframe to a CSV file
-    # df.to_csv(f"output/truck_socs/activities_constant_charging_{charging_powers['home base']}-{charging_powers['industrial area']}.csv", index=False)
-    
     return df
 
 
-def evaluate_charging_distribution(df, batt_cap, soc_min, soc_max, evaluate_per_fleet=True, **kwargs):
+
+def evaluate_charging_distribution(df, soc_min, evaluate_per_fleet=True, **kwargs):
     
     # Calculate the number of instances where soc < soc_min for each freight forwarder
     negative_soc_counts = df[df['soc'] < soc_min].groupby('freight_forwarder').size()
