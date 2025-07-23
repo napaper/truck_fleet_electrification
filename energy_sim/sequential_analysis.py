@@ -124,7 +124,7 @@ def combine_tracks_and_stops(df_stops, df_tracks_with_energy):
         df_activities.loc[last_idx, 'occupation'] = 'home base'
 
     # Save the combined dataframe to a CSV file
-    df_activities.to_csv('output/csvs/tracks_and_stops.csv', index=False)
+    # df_activities.to_csv('output/csvs/tracks_and_stops.csv', index=False)
     
     # Reset index
     df_activities = df_activities.reset_index(drop=True)
