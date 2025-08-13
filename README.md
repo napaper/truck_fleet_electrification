@@ -13,6 +13,7 @@ anna.paper@tum.de
 
 #### Contributors
 Georg Balke, M.Sc. - Research Associate 07/2021 - 12/2025
+
 Philip Rosborough, B.Sc. - Semester thesis 11/2024 - 06/2025
 
 ## Overview
