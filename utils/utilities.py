@@ -1,3 +1,23 @@
+"""
+Database utility functions for truck fleet electrification analysis.
+
+IMPORTANT NOTE: This script is ONLY required when database access is needed.
+The current analysis workflow uses CSV files instead of database queries, so this
+script is not essential for the main analyses.
+
+This module provides:
+- PostgreSQL database connection management
+- SQL query execution with caching
+- Geospatial data processing (GeoDataFrames)
+
+Keep this script if you plan to:
+- Re-integrate database access in the future
+- Work with the original PostgreSQL data source
+- Need geospatial data processing capabilities
+
+For CSV-based analysis, this script can be safely ignored.
+"""
+
 import pandas as pd
 import sqlalchemy
 import joblib

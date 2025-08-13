@@ -1,67 +1,162 @@
+"""
+Truck Fleet Data Processing Script
+
+This script provides comprehensive data processing functions for truck fleet analysis,
+including trip preprocessing, tour correction, stop analysis, and energy calculations.
+It is a core component of the truck fleet electrification analysis workflow.
+
+Version: 1.0
+"""
+
 import pandas as pd
 from datetime import datetime, timedelta
 import os
 import joblib
 
-cache = joblib.Memory(".cache")  # , verbose=0
+# Initialize joblib memory cache for function memoization
+cache = joblib.Memory(".cache")
 
+# Define location types for classification
 LOCATIONS = ['home_base', 'rest_area', 'service_area_fuel', 'industrial_area', 'other_area']
 
 def load_data():
-    df_trips_unfiltered = pd.read_csv('input/stations/tracks.csv', index_col='track_id', parse_dates=['start_time', 'stop_time'])
+    """
+    Load trip and fleet data from CSV files.
+    
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - df_trips_unfiltered : pandas.DataFrame
+            Raw trip data with track_id as index
+        - df_fleet : pandas.DataFrame
+            Fleet information with vehicle_id as index
+    """
+    df_trips_unfiltered = pd.read_csv(
+        'input/stations/tracks.csv', 
+        index_col='track_id', 
+        parse_dates=['start_time', 'stop_time']
+    )
     df_fleet = pd.read_csv('input/home/fleet.csv', index_col='vehicle_id')
-    #zf = zipfile.ZipFile('input/home/speed.zip')
-    return df_trips_unfiltered, df_fleet#, zf
+    
+    return df_trips_unfiltered, df_fleet
 
 
 def load_speed_data(zf, i_veh, i_trip):
+    """
+    Load speed data for a specific vehicle and trip from zip file.
+    
+    Parameters
+    ----------
+    zf : zipfile.ZipFile
+        Zip file containing speed data
+    i_veh : int
+        Vehicle identifier
+    i_trip : int
+        Trip identifier
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Speed data for the specified vehicle and trip
+    """
     df_speed = pd.read_csv(zf.open(f'input/home/speed/{i_veh}/{i_trip}.csv'))
     return df_speed
 
 
 def preprocess_trips_data(df_trips_unfiltered, df_fleet):
     """
-    Filters out trips shorter than 1 km, with avg. speeds > max. speed and with negative durations. 
-    Converts distances to kilometers and speed to km/h, 
-    converts time strings to datetime objects and calculates trip durations in hours
+    Preprocess and filter trip data for analysis.
+    
+    This function applies quality filters and data transformations:
+    - Filters out trips shorter than 1 km
+    - Removes trips with average speeds exceeding maximum speeds
+    - Eliminates trips with negative durations
+    - Converts units and adds derived columns
+    
+    Parameters
+    ----------
+    df_trips_unfiltered : pandas.DataFrame
+        Raw trip data with track_id as index
+    df_fleet : pandas.DataFrame
+        Fleet information with vehicle_id as index
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Preprocessed trip data with quality filters applied
     """
+    # Create a copy to avoid modifying the original dataframe
     df_trips = df_trips_unfiltered.copy()
+    
+    # Apply quality filters
     df_trips = df_trips.loc[df_trips_unfiltered.distance > 1000]
     df_trips = df_trips.loc[df_trips_unfiltered.avg_speed <= df_trips_unfiltered.max_speed]
-
+    
+    # Convert distance to kilometers
     df_trips['distance_km'] = df_trips['distance'] / 1000
-    #transfer strings to datetime objects
+    
+    # Convert time strings to datetime objects
     df_trips['stop_time'] = pd.to_datetime(df_trips['stop_time'], format='ISO8601')
     df_trips['start_time'] = pd.to_datetime(df_trips['start_time'], format='ISO8601')
+    
+    # Calculate trip duration in seconds and hours
     df_trips['duration'] = (df_trips['stop_time'] - df_trips['start_time']) / pd.Timedelta(seconds=1)
     df_trips = df_trips[df_trips['duration'] > 0]
     df_trips['duration_h'] = df_trips['duration'] / 3600
+    
+    # Convert speeds to km/h
     df_trips['max_speed_kmh'] = df_trips['max_speed'] * 3.6
     df_trips['avg_speed_kmh'] = df_trips['avg_speed'] * 3.6
-    df_trips = df_trips.merge(df_fleet[['gross_vehicle_weight', 'total_mass_with_trailer', 'axle_class']], left_on='vehicle_id', right_index=True, how='left')
-    df_trips['other_area'] = (~df_trips['home_base']) & (~df_trips['service_area_fuel']) & (~df_trips['rest_area']) & (~df_trips['industrial_area'])
+    
+    # Merge fleet information
+    fleet_columns = ['gross_vehicle_weight', 'total_mass_with_trailer', 'axle_class']
+    df_trips = df_trips.merge(
+        df_fleet[fleet_columns], 
+        left_on='vehicle_id', 
+        right_index=True, 
+        how='left'
+    )
+    
+    # Create other_area classification
+    df_trips['other_area'] = (
+        (~df_trips['home_base']) & 
+        (~df_trips['service_area_fuel']) & 
+        (~df_trips['rest_area']) & 
+        (~df_trips['industrial_area'])
+    )
+    
     return df_trips
 
 
 def fix_faulty_tour_assignment(trips, trips_unfiltered):
     """
-    This function corrects tracks which have been assigned to the wrong tour. The wrong assignment
-    happens if the previous tour did not have a track that ended at a home base. Thus all
-    subsequent tracks are added to the tour until there is a track that ends at a home base, 
-    even if the tracks clearly belong to a different tour 
-    e.g tour 62, Track 2575 which has a different vehicle id to the tour's other tracks
-
-    Tracks that have been assigned to the wrong tour are assigned to a new synthetic tour_id
-    with the format: x00000.
-    For now this is done instead of assigning them to the following tour_id (which should be
-    their correct tour), to ensure they can be identfied clearly, 
-    because it is still unsure which tour they actually belong to.
+    Correct tracks that have been incorrectly assigned to tours.
+    
+    This function addresses the issue where tracks are assigned to the wrong tour
+    when the previous tour doesn't end at a home base. Subsequent tracks are then
+    incorrectly added to the tour until a home base is reached, even if they belong
+    to different tours.
+    
+    Tracks with incorrect tour assignments are given new synthetic tour IDs
+    in the format x00000 for clear identification.
+    
+    Parameters
+    ----------
+    trips : pandas.DataFrame
+        Preprocessed trip data
+    trips_unfiltered : pandas.DataFrame
+        Raw unfiltered trip data for reference
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Trip data with corrected tour assignments
     """
-
     df_trips = trips.copy()
     df_trips_unfiltered = trips_unfiltered.copy()
 
-    # Find tours with multiple vehicle IDs
+    # Identify tours with multiple vehicle IDs (problematic tours)
     tours_with_multiple_vehicles = df_trips.groupby('tour_id')['vehicle_id'].nunique()
     problematic_tours = tours_with_multiple_vehicles[tours_with_multiple_vehicles > 1].index.tolist()
 
@@ -93,19 +188,14 @@ def fix_faulty_tour_assignment(trips, trips_unfiltered):
                     df_trips.loc[vehicle_track_indices, 'tour_id'] = new_tour_id
                     print(f"Split tour {tour_id}: assigned new tour_id {new_tour_id} to vehicle {vehicle_id}")
 
-    # Get the last track of each tour from df_trips_unfiltered
+    # Update last track information from unfiltered data
     df_last_tracks = df_trips_unfiltered.reset_index().sort_values(['tour_id', 'stop_time']).groupby('tour_id').last()
-    # Create a mapping dictionary for the last track's cid
     last_track_mapping = df_last_tracks[['track_id', 'cid']].reset_index()
 
-    # Mark tracks that are the last in their tour
-    #df_trips['is_last_track'] = df_trips.index.isin(last_track_mapping['track_id'])
-
-    # For each last track, update cid and set home_base to True
+    # Update cid and home_base for last tracks of each tour
     for _, row in last_track_mapping.iterrows():
         tour = row['tour_id']
-        if tour in df_trips['tour_id'].values: # check that the tour has not beeen filtered out
-            #last_track_id_raw = df_trips_unfiltered.loc[df_trips_unfiltered['tour_id'] == tour].index.max()
+        if tour in df_trips['tour_id'].values:  # Check that the tour hasn't been filtered out
             last_track_id = df_trips.loc[df_trips['tour_id'] == tour].index.max()
             df_trips.loc[last_track_id, 'cid'] = row['cid']
             df_trips.loc[last_track_id, 'home_base'] = True
@@ -115,13 +205,26 @@ def fix_faulty_tour_assignment(trips, trips_unfiltered):
 
 def fix_faulty_tour_endings(trips, trips_unfiltered):
     """
-    Iterates through each freight_forwarder in the DataFrame and fixes the issue where
-    the last trip of a tour is not correctly marked as returning to the home base.
-
-    If new home bases are added update homebase_map 
+    Fix tours that don't correctly end at home bases.
+    
+    This function iterates through each freight forwarder and corrects tours
+    where the last trip is not properly marked as returning to a home base.
+    It assigns appropriate home base CIDs based on the freight forwarder's
+    known home base locations.
+    
+    Parameters
+    ----------
+    trips : pandas.DataFrame
+        Preprocessed trip data
+    trips_unfiltered : pandas.DataFrame
+        Raw unfiltered trip data for reference
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Trip data with corrected tour endings
     """
-
-    # Make a copy to avoid modifying the original DataFrame directly
+    # Create copies to avoid modifying the original dataframes
     df = trips.copy()
     df_raw = trips_unfiltered.copy()
     
@@ -130,62 +233,59 @@ def fix_faulty_tour_endings(trips, trips_unfiltered):
     
     # Track changes for reporting
     total_fixed_tours = 0
-    homebase_map = {1: [0], 2: [745], 3: [2, 4, 20, 26], 4: [502], 5: [102, 868, 1251, 1265], 6: [412, 809, 842]}
+    
+    # Define home base locations for each freight forwarder
+    homebase_map = {
+        1: [0], 
+        2: [745], 
+        3: [2, 4, 20, 26], 
+        4: [502], 
+        5: [102, 868, 1251, 1265], 
+        6: [412, 809, 842]
+    }
 
     # Process each freight forwarder separately
     for ff in freight_forwarders:
         # Get data for this freight forwarder
         ff_data = df[df['freight_forwarder'] == ff]
         bases = homebase_map[ff]
+        
         # Find the most common base for this freight forwarder
         base_counts = {}
         for base in bases:
-            # Count how many tracks have this base as their destination
             count = len(ff_data[ff_data['cid'] == base])
             base_counts[base] = count
             
         # Find the most common base
         most_common_base = max(base_counts, key=base_counts.get) if base_counts else bases[0]
 
-
         # Find the last track of each tour
         last_tracks = ff_data.sort_values(['tour_id', 'stop_time']).groupby('tour_id').last()
         
-
-        # Count tours that need fixing (last track doesn't end at home base)
-        # Find tours that don't end at one of the home bases for this freight forwarder
+        # Identify tours that need fixing (don't end at home base)
         tours_to_fix = last_tracks[~last_tracks['cid'].isin(bases)].index.tolist()
         fixed_count = len(tours_to_fix)
         total_fixed_tours += fixed_count
-
         
-        
-        # Mark these last tracks as returning to home base
+        # Fix tours that don't end at home base
         if fixed_count > 0:
             for tour_id in tours_to_fix:
-                # Get the last track_id for this tour
+                # Get the last track for this tour
                 tour_tracks = df[(df['tour_id'] == tour_id)].sort_values('stop_time')
                 last_track_id = tour_tracks.index[-1]
                 tour_tracks_raw = df_raw[(df_raw['tour_id'] == tour_id)].sort_values('stop_time')
 
+                # Find matching home bases in the tour
                 matching_bases = [cid for cid in tour_tracks_raw['cid'] if cid in bases]
             
-                # If any track in this tour has a cid that matches a home base, assign it to the last track
-                # If there are multiple matching bases, the first one is used
                 if matching_bases:
-                    df.loc[last_track_id, 'cid'] = matching_bases[0]  # Use the first matching base
-                    print('Fixing tour:', tour_id, 'assigning last track to cid:', matching_bases[0])
+                    # Use the first matching base found in the tour
+                    df.loc[last_track_id, 'cid'] = matching_bases[0]
+                    print(f'Fixing tour {tour_id}: assigning last track to cid {matching_bases[0]}')
                 else: 
-                    # If no matching base is found, assign the last track to the most common home base
+                    # Assign to the most common home base if no matches found
                     df.loc[last_track_id, 'cid'] = most_common_base 
-                    print('Fixing tour:', tour_id, 'assigning last track to most common home base with cid:', most_common_base)
-            
-                # # Update the last track to end at home base
-                # df.loc[last_track_id, 'home_base'] = True
-                # df.loc[last_track_id, 'rest_area'] = False
-                # df.loc[last_track_id, 'service_area_fuel'] = False
-                # df.loc[last_track_id, 'industrial_area'] = False
-                # df.loc[last_track_id, 'other_area'] = False
+                    print(f'Fixing tour {tour_id}: assigning last track to most common home base cid {most_common_base}')
                 
             print(f"Fixed {fixed_count} tours for freight forwarder {ff}")
     
@@ -194,37 +294,120 @@ def fix_faulty_tour_endings(trips, trips_unfiltered):
 
 @cache.cache
 def process_stops_data(df_trips):
+    """
+    Process trip data to create stop analysis with location classification and rest times.
+    
+    This function creates mutually exclusive location classifications and calculates
+    rest times between consecutive trips for each vehicle.
+    
+    Parameters
+    ----------
+    df_trips : pandas.DataFrame
+        Preprocessed trip data with location flags
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Stop data with location classification and rest time calculations
+    """
     df_stops = df_trips.copy()
+    
+    # Create mutually exclusive location classifications
+    # Priority order: home_base > service_area_fuel > rest_area > industrial_area > other_area
     df_stops['service_area_fuel'] = (~df_trips['home_base']) & df_trips['service_area_fuel']
     df_stops['rest_area'] = (~df_trips['home_base']) & (~df_trips['service_area_fuel']) & df_trips['rest_area']
-    df_stops['industrial_area'] = (~df_trips['home_base']) & (~df_trips['service_area_fuel']) & (~df_stops['rest_area']) & df_trips['industrial_area']
-    df_stops['other_area'] = (~df_trips['home_base']) & (~df_trips['service_area_fuel']) & (~df_stops['rest_area']) & (~df_stops['industrial_area'])
+    df_stops['industrial_area'] = (
+        (~df_trips['home_base']) & 
+        (~df_trips['service_area_fuel']) & 
+        (~df_stops['rest_area']) & 
+        df_trips['industrial_area']
+    )
+    df_stops['other_area'] = (
+        (~df_trips['home_base']) & 
+        (~df_trips['service_area_fuel']) & 
+        (~df_stops['rest_area']) & 
+        (~df_stops['industrial_area'])
+    )
+    
+    # Create location label from boolean flags
     df_stops['location'] = df_stops[LOCATIONS].idxmax(axis=1).str.replace('_', ' ')
+    
+    # Calculate rest time between consecutive trips for each vehicle
     rest_time = df_trips.groupby('vehicle_id').start_time.shift(-1) - df_trips['stop_time']
-    rest_time = rest_time.fillna(pd.Timedelta(seconds=0))
+    rest_time = rest_time.fillna(pd.Timedelta(seconds=0))  # Set rest time to 0 for last trip
     df_stops = df_stops.assign(rest_time=rest_time / pd.Timedelta(seconds=1))
-    # If there is no more rest time (i.e. after the last recorded trip), the rest time is set to 0
-    #df_stops = df_stops.assign(rest_time=(df_trips.groupby('vehicle_id').start_time.shift(-1) - df_trips.stop_time) / pd.Timedelta(seconds=1))
-
+    
+    # Convert rest time to hours
     df_stops = df_stops.assign(rest_time_h=df_stops['rest_time'] / 3600)
+    
     return df_stops
 
 def time_to_seconds(t):
+    """
+    Convert time object to total seconds since midnight.
+    
+    Parameters
+    ----------
+    t : datetime.time or pandas.Timestamp
+        Time object to convert
+        
+    Returns
+    -------
+    int
+        Total seconds since midnight
+    """
     return t.hour * 3600 + t.minute * 60 + t.second
 
+
 def seconds_to_time(s):
+    """
+    Convert seconds since midnight to time object.
+    
+    Parameters
+    ----------
+    s : int or float
+        Seconds since midnight
+        
+    Returns
+    -------
+    pandas.Timestamp
+        Time object representing the given seconds
+    """
     return pd.Timestamp("1970-01-01") + pd.to_timedelta(s, unit='s')
 
 
-# ------------------------------------------------------------------------------
-#                              GENERAL DESCRIPTION
-# ------------------------------------------------------------------------------
+# =============================================================================
+#                              META DATA CALCULATION
+# =============================================================================
 
 
 def calculate_meta_data(df_trips_unfiltered, df_trips, df_fleet):
+    """
+    Calculate comprehensive metadata statistics for the truck fleet dataset.
+    
+    This function computes various metrics including distance, time, speed,
+    location distribution, and temporal patterns for both overall fleet
+    and individual freight forwarders.
+    
+    Parameters
+    ----------
+    df_trips_unfiltered : pandas.DataFrame
+        Raw unfiltered trip data for total recording counts
+    df_trips : pandas.DataFrame
+        Preprocessed trip data for analysis
+    df_fleet : pandas.DataFrame
+        Fleet information with vehicle specifications
+        
+    Returns
+    -------
+    dict
+        Dictionary containing all calculated metadata metrics
+    """
+    # Ensure datetime format for time-based calculations
     df_trips['start_time'] = pd.to_datetime(df_trips['start_time'], utc=True)
     df_trips['stop_time'] = pd.to_datetime(df_trips['stop_time'], utc=True)
     
+    # Basic fleet and trip statistics
     total_distance = df_trips['distance'].sum()
     total_time = df_trips['duration'].sum()
     trips_longer_1km = len(df_trips)
@@ -232,20 +415,24 @@ def calculate_meta_data(df_trips_unfiltered, df_trips, df_fleet):
     fleet_size = len(df_fleet)
     median_vehicle_driving_distance_km = df_trips.groupby('vehicle_id')['distance'].sum().median() / 1000
     
+    # Speed and signal quality metrics
     avg_speed_per_trip = df_trips['avg_speed'].mean()
     max_speed = df_trips['max_speed'].max()
     total_signal_loss = df_trips['n_signal_loss'].sum()
     avg_signal_loss_ratio = df_trips['r_signal_loss'].mean()
     
+    # GPS quality metrics (if available)
     avg_hdop = df_trips['avg_hdop'].mean() if 'avg_hdop' in df_trips.columns else None
     max_hdop = df_trips['max_hdop'].max() if 'max_hdop' in df_trips.columns else None
     
+    # Statistical summaries
     rest_time_stats = df_trips['duration_h'].describe()
     distance_stats = df_trips['distance_km'].describe()
     
+    # Location distribution analysis
     location_distribution = df_trips[LOCATIONS].mean() * 100
     
-    # Calculate metrics per freight_forwarder
+    # Freight forwarder specific metrics
     ff_metrics = df_trips.groupby('freight_forwarder').agg({
         'distance': 'sum',
         'duration': 'sum',
@@ -255,50 +442,61 @@ def calculate_meta_data(df_trips_unfiltered, df_trips, df_fleet):
     ff_metrics['total_distance_km'] = ff_metrics['total_distance'] / 1000
     ff_metrics['total_duration_h'] = ff_metrics['total_duration'] / 3600
     
+    # Spatial metrics (placeholders for future implementation)
     max_latitude = 0  # Placeholder for maximum latitude
     min_latitude = 0  # Placeholder for minimum latitude
     max_longitude = 0  # Placeholder for maximum longitude
     min_longitude = 0  # Placeholder for minimum longitude
     
+    # Data quality metrics
     avg_points_per_trip = df_trips['track_gap'].mean()
     
+    # Daily aggregation metrics
     avg_trip_time_per_day = df_trips.groupby(df_trips['start_time'].dt.date)['duration'].mean().mean()
     max_trip_time_per_day = df_trips.groupby(df_trips['start_time'].dt.date)['duration'].sum().max()
     
     avg_trip_distance_per_day = df_trips.groupby(df_trips['start_time'].dt.date)['distance'].mean().mean()
     max_trip_distance_per_day = df_trips.groupby(df_trips['start_time'].dt.date)['distance'].sum().max()
     
+    # Tour-level metrics
     avg_trips_per_tour = df_trips.groupby('tour_id').size().mean()
     avg_signal_loss_per_tour = df_trips.groupby('tour_id')['r_signal_loss'].mean().mean()
     
+    # Recording statistics
     total_recordings = len(df_trips_unfiltered)
     recordings_under_1km = len(df_trips_unfiltered[df_trips_unfiltered['distance'] < 1000])  
     
+    # Time range
     min_start_time = df_trips['start_time'].min()
     max_start_time = df_trips['start_time'].max()
     
-    # Temporal meta data
+    # Temporal patterns per truck
     avg_trips_per_day_per_truck = df_trips.groupby('vehicle_id').size().mean()
     avg_trip_duration_h = df_trips['duration_h'].mean()
     avg_trip_distance_km = df_trips['distance_km'].mean()
     
-    # Calculate average daily distance per truck
+    # Daily distance calculations
     df_trips['date'] = df_trips['start_time'].dt.date
     daily_distances = df_trips.groupby(['vehicle_id', 'date'])['distance_km'].sum().reset_index()
     avg_daily_distance_per_truck_km = daily_distances.groupby('vehicle_id')['distance_km'].mean().mean()
 
+    # Speed conversion to km/h
     avg_speed_per_trip_kmh = avg_speed_per_trip * 3.6
 
-    # Calculate average start and end time of day
+    # Calculate average daily start and end times
     first_trips = df_trips.groupby(['vehicle_id', 'date'])['start_time'].min().reset_index()
     last_trips = df_trips.groupby(['vehicle_id', 'date'])['stop_time'].max().reset_index()
 
-    avg_daily_start_time_seconds = first_trips['start_time'].dt.hour.mean() * 3600 + \
-                                   first_trips['start_time'].dt.minute.mean() * 60 + \
-                                   first_trips['start_time'].dt.second.mean()
-    avg_daily_end_time_seconds = last_trips['stop_time'].dt.hour.mean() * 3600 + \
-                                 last_trips['stop_time'].dt.minute.mean() * 60 + \
-                                 last_trips['stop_time'].dt.second.mean()
+    avg_daily_start_time_seconds = (
+        first_trips['start_time'].dt.hour.mean() * 3600 + 
+        first_trips['start_time'].dt.minute.mean() * 60 + 
+        first_trips['start_time'].dt.second.mean()
+    )
+    avg_daily_end_time_seconds = (
+        last_trips['stop_time'].dt.hour.mean() * 3600 + 
+        last_trips['stop_time'].dt.minute.mean() * 60 + 
+        last_trips['stop_time'].dt.second.mean()
+    )
     avg_daily_start_time = seconds_to_time(avg_daily_start_time_seconds).strftime('%H:%M:%S')
     avg_daily_end_time = seconds_to_time(avg_daily_end_time_seconds).strftime('%H:%M:%S')
 
